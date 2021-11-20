@@ -13,6 +13,7 @@
 #include <sbi/sbi_const.h>
 #include <sbi/sbi_platform.h>
 #include <sbi/sbi_system.h>
+#include <sbi_utils/fdt/fdt_helper.h>
 #include <sbi_utils/fdt/fdt_fixup.h>
 #include <sbi_utils/ipi/aclint_mswi.h>
 #include <sbi_utils/irqchip/plic.h>
@@ -42,8 +43,13 @@ static struct aclint_mswi_data mswi = {
 };
 
 static struct aclint_mtimer_data mtimer = {
-	.addr = K210_ACLINT_MTIMER_ADDR,
-	.size = ACLINT_MTIMER_SIZE,
+	.mtime_freq = K210_ACLINT_MTIMER_FREQ,
+	.mtime_addr = K210_ACLINT_MTIMER_ADDR +
+		      ACLINT_DEFAULT_MTIME_OFFSET,
+	.mtime_size = ACLINT_DEFAULT_MTIME_SIZE,
+	.mtimecmp_addr = K210_ACLINT_MTIMER_ADDR +
+			 ACLINT_DEFAULT_MTIMECMP_OFFSET,
+	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
 	.first_hartid = 0,
 	.hart_count = K210_HART_COUNT,
 	.has_64bit_mmio = TRUE,
@@ -103,7 +109,7 @@ static struct sbi_system_reset_device k210_reset = {
 static int k210_early_init(bool cold_boot)
 {
 	if (cold_boot)
-		sbi_system_reset_set_device(&k210_reset);
+		sbi_system_reset_add_device(&k210_reset);
 
 	return 0;
 }
@@ -115,7 +121,7 @@ static int k210_final_init(bool cold_boot)
 	if (!cold_boot)
 		return 0;
 
-	fdt = sbi_scratch_thishart_arg1_ptr();
+	fdt = fdt_get_address();
 
 	fdt_cpu_fixup(fdt);
 	fdt_fixups(fdt);

@@ -24,9 +24,11 @@
 #include <sbi_utils/reset/fdt_reset.h>
 
 extern const struct platform_override sifive_fu540;
+extern const struct platform_override sifive_fu740;
 
 static const struct platform_override *special_platforms[] = {
 	&sifive_fu540,
+	&sifive_fu740,
 };
 
 static const struct platform_override *generic_plat = NULL;
@@ -118,24 +120,19 @@ fail:
 
 static int generic_early_init(bool cold_boot)
 {
-	int rc;
-
-	if (generic_plat && generic_plat->early_init) {
-		rc = generic_plat->early_init(cold_boot, generic_plat_match);
-		if (rc)
-			return rc;
-	}
-
-	if (!cold_boot)
+	if (!generic_plat || !generic_plat->early_init)
 		return 0;
 
-	return fdt_reset_init();
+	return generic_plat->early_init(cold_boot, generic_plat_match);
 }
 
 static int generic_final_init(bool cold_boot)
 {
 	void *fdt;
 	int rc;
+
+	if (cold_boot)
+		fdt_reset_init();
 
 	if (generic_plat && generic_plat->final_init) {
 		rc = generic_plat->final_init(cold_boot, generic_plat_match);
@@ -146,7 +143,7 @@ static int generic_final_init(bool cold_boot)
 	if (!cold_boot)
 		return 0;
 
-	fdt = sbi_scratch_thishart_arg1_ptr();
+	fdt = fdt_get_address();
 
 	fdt_cpu_fixup(fdt);
 	fdt_fixups(fdt);
@@ -175,7 +172,7 @@ static void generic_final_exit(void)
 
 static int generic_domains_init(void)
 {
-	return fdt_domains_populate(sbi_scratch_thishart_arg1_ptr());
+	return fdt_domains_populate(fdt_get_address());
 }
 
 static u64 generic_tlbr_flush_limit(void)
@@ -187,7 +184,7 @@ static u64 generic_tlbr_flush_limit(void)
 
 static int generic_pmu_init(void)
 {
-	return fdt_pmu_setup(sbi_scratch_thishart_arg1_ptr());
+	return fdt_pmu_setup(fdt_get_address());
 }
 
 static uint64_t generic_pmu_xlate_to_mhpmevent(uint32_t event_idx,

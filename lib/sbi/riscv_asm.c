@@ -11,6 +11,7 @@
 #include <sbi/riscv_encoding.h>
 #include <sbi/sbi_error.h>
 #include <sbi/sbi_platform.h>
+#include <sbi/sbi_console.h>
 
 /* determine CPU extension, return non-zero support */
 int misa_extension_imp(char ext)
@@ -75,6 +76,7 @@ void misa_string(int xlen, char *out, unsigned int out_sz)
 			out[pos++] = '8';
 			break;
 		default:
+			BUG();
 			return;
 		}
 	}
@@ -124,6 +126,11 @@ unsigned long csr_read_num(int csr_num)
 	switchcase_csr_read_4(CSR_MHPMCOUNTER4, ret)
 	switchcase_csr_read_8(CSR_MHPMCOUNTER8, ret)
 	switchcase_csr_read_16(CSR_MHPMCOUNTER16, ret)
+	switchcase_csr_read(CSR_MCOUNTINHIBIT, ret)
+	switchcase_csr_read(CSR_MHPMEVENT3, ret)
+	switchcase_csr_read_4(CSR_MHPMEVENT4, ret)
+	switchcase_csr_read_8(CSR_MHPMEVENT8, ret)
+	switchcase_csr_read_16(CSR_MHPMEVENT16, ret)
 #if __riscv_xlen == 32
 	switchcase_csr_read(CSR_MCYCLEH, ret)
 	switchcase_csr_read(CSR_MINSTRETH, ret)
@@ -131,9 +138,14 @@ unsigned long csr_read_num(int csr_num)
 	switchcase_csr_read_4(CSR_MHPMCOUNTER4H, ret)
 	switchcase_csr_read_8(CSR_MHPMCOUNTER8H, ret)
 	switchcase_csr_read_16(CSR_MHPMCOUNTER16H, ret)
+	switchcase_csr_read(CSR_MHPMEVENT3H, ret)
+	switchcase_csr_read_4(CSR_MHPMEVENT4H, ret)
+	switchcase_csr_read_8(CSR_MHPMEVENT8H, ret)
+	switchcase_csr_read_16(CSR_MHPMEVENT16H, ret)
 #endif
 
 	default:
+		BUG();
 		break;
 	};
 
@@ -189,6 +201,10 @@ void csr_write_num(int csr_num, unsigned long val)
 	switchcase_csr_write_4(CSR_MHPMCOUNTER4H, val)
 	switchcase_csr_write_8(CSR_MHPMCOUNTER8H, val)
 	switchcase_csr_write_16(CSR_MHPMCOUNTER16H, val)
+	switchcase_csr_write(CSR_MHPMEVENT3H, val)
+	switchcase_csr_write_4(CSR_MHPMEVENT4H, val)
+	switchcase_csr_write_8(CSR_MHPMEVENT8H, val)
+	switchcase_csr_write_16(CSR_MHPMEVENT16H, val)
 #endif
 	switchcase_csr_write(CSR_MCOUNTINHIBIT, val)
 	switchcase_csr_write(CSR_MHPMEVENT3, val)
@@ -197,6 +213,7 @@ void csr_write_num(int csr_num, unsigned long val)
 	switchcase_csr_write_16(CSR_MHPMEVENT16, val)
 
 	default:
+		BUG();
 		break;
 	};
 
@@ -212,6 +229,9 @@ void csr_write_num(int csr_num, unsigned long val)
 static unsigned long ctz(unsigned long x)
 {
 	unsigned long ret = 0;
+
+	if (x == 0)
+		return 8 * sizeof(x);
 
 	while (!(x & 1UL)) {
 		ret++;
@@ -248,6 +268,7 @@ int pmp_set(unsigned int n, unsigned long prot, unsigned long addr,
 		return SBI_ENOTSUPP;
 
 	/* encode PMP config */
+	prot &= ~PMP_A;
 	prot |= (log2len == PMP_SHIFT) ? PMP_A_NA4 : PMP_A_NAPOT;
 	cfgmask = ~(0xffUL << pmpcfg_shift);
 	pmpcfg	= (csr_read_num(pmpcfg_csr) & cfgmask);

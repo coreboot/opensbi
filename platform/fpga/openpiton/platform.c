@@ -26,6 +26,7 @@
 #define OPENPITON_DEFAULT_PLIC_NUM_SOURCES	2
 #define OPENPITON_DEFAULT_HART_COUNT		3
 #define OPENPITON_DEFAULT_CLINT_ADDR		0xfff1020000
+#define OPENPITON_DEFAULT_ACLINT_MTIMER_FREQ	1000000
 #define OPENPITON_DEFAULT_ACLINT_MSWI_ADDR	\
 		(OPENPITON_DEFAULT_CLINT_ADDR + CLINT_MSWI_OFFSET)
 #define OPENPITON_DEFAULT_ACLINT_MTIMER_ADDR	\
@@ -49,8 +50,13 @@ static struct aclint_mswi_data mswi = {
 };
 
 static struct aclint_mtimer_data mtimer = {
-	.addr = OPENPITON_DEFAULT_ACLINT_MTIMER_ADDR,
-	.size = ACLINT_MTIMER_SIZE,
+	.mtime_freq = OPENPITON_DEFAULT_ACLINT_MTIMER_FREQ,
+	.mtime_addr = OPENPITON_DEFAULT_ACLINT_MTIMER_ADDR +
+		      ACLINT_DEFAULT_MTIME_OFFSET,
+	.mtime_size = ACLINT_DEFAULT_MTIME_SIZE,
+	.mtimecmp_addr = OPENPITON_DEFAULT_ACLINT_MTIMER_ADDR +
+			 ACLINT_DEFAULT_MTIMECMP_OFFSET,
+	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
 	.first_hartid = 0,
 	.hart_count = OPENPITON_DEFAULT_HART_COUNT,
 	.has_64bit_mmio = TRUE,
@@ -64,12 +70,13 @@ static int openpiton_early_init(bool cold_boot)
 	void *fdt;
 	struct platform_uart_data uart_data;
 	struct plic_data plic_data;
-	unsigned long clint_addr;
+	unsigned long aclint_freq;
+	uint64_t clint_addr;
 	int rc;
 
 	if (!cold_boot)
 		return 0;
-	fdt = sbi_scratch_thishart_arg1_ptr();
+	fdt = fdt_get_address();
 
 	rc = fdt_parse_uart8250(fdt, &uart_data, "ns16550");
 	if (!rc)
@@ -79,10 +86,17 @@ static int openpiton_early_init(bool cold_boot)
 	if (!rc)
 		plic = plic_data;
 
+	rc = fdt_parse_timebase_frequency(fdt, &aclint_freq);
+	if (!rc)
+		mtimer.mtime_freq = aclint_freq;
+
 	rc = fdt_parse_compat_addr(fdt, &clint_addr, "riscv,clint0");
 	if (!rc) {
 		mswi.addr = clint_addr;
-		mtimer.addr = clint_addr + CLINT_MTIMER_OFFSET;
+		mtimer.mtime_addr = clint_addr + CLINT_MTIMER_OFFSET +
+				    ACLINT_DEFAULT_MTIME_OFFSET;
+		mtimer.mtimecmp_addr = clint_addr + CLINT_MTIMER_OFFSET +
+				    ACLINT_DEFAULT_MTIMECMP_OFFSET;
 	}
 
 	return 0;
@@ -98,7 +112,7 @@ static int openpiton_final_init(bool cold_boot)
 	if (!cold_boot)
 		return 0;
 
-	fdt = sbi_scratch_thishart_arg1_ptr();
+	fdt = fdt_get_address();
 	fdt_fixups(fdt);
 
 	return 0;

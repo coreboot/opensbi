@@ -104,6 +104,14 @@ LLVM/Clang toolchain due to LLVM's ability to support multiple backends in the
 same binary, so is often an easy way to obtain a working cross-compilation
 toolchain.
 
+Basically, we prefer toolchains with Position Independent Executable (PIE)
+support like *riscv64-linux-gnu-gcc*, *riscv64-unknown-freebsd-gcc*, or
+*Clang/LLVM* as they generate PIE firmware images that can run at arbitrary
+address with appropriate alignment. If a bare-metal GNU toolchain (e.g.
+*riscv64-unknown-elf-gcc*) is used, static linked firmware images are
+generated instead. *Clang/LLVM* can still generate PIE images if a bare-metal
+triple is used (e.g. *-target riscv64-unknown-elf*).
+
 Please note that only a 64-bit version of the toolchain is available in
 the Bootlin toolchain repository for now.
 
@@ -116,7 +124,7 @@ architecture than RISC-V.
 
 For cross-compiling, the environment variable *CROSS_COMPILE* must be defined
 to specify the name prefix of the RISC-V compiler toolchain executables, e.g.
-*riscv64-unknown-elf-* if the gcc executable used is *riscv64-unknown-elf-gcc*.
+*riscv64-linux-gnu-* if the gcc executable used is *riscv64-linux-gnu-gcc*.
 
 To build *libsbi.a* simply execute:
 ```
@@ -192,16 +200,16 @@ Building 32-bit / 64-bit OpenSBI Images
 ---------------------------------------
 By default, building OpenSBI generates 32-bit or 64-bit images based on the
 supplied RISC-V cross-compile toolchain. For example if *CROSS_COMPILE* is set
-to *riscv64-unknown-elf-*, 64-bit OpenSBI images will be generated. If building
+to *riscv64-linux-gnu-*, 64-bit OpenSBI images will be generated. If building
 32-bit OpenSBI images, *CROSS_COMPILE* should be set to a toolchain that is
-pre-configured to generate 32-bit RISC-V codes, like *riscv32-unknown-elf-*.
+pre-configured to generate 32-bit RISC-V codes, like *riscv32-linux-gnu-*.
 
 However it's possible to explicitly specify the image bits we want to build with
 a given RISC-V toolchain. This can be done by setting the environment variable
 *PLATFORM_RISCV_XLEN* to the desired width, for example:
 
 ```
-export CROSS_COMPILE=riscv64-unknown-elf-
+export CROSS_COMPILE=riscv64-linux-gnu-
 export PLATFORM_RISCV_XLEN=32
 ```
 
@@ -235,7 +243,7 @@ valid triple.
 These can also be mixed; for example using a GCC cross-compiler but LLVM
 binutils would be:
 ```
-make CC=riscv64-unknown-elf-gcc LLVM=1
+make CC=riscv64-linux-gnu-gcc LLVM=1
 ```
 
 These variables must be passed for all the make invocations described in this
@@ -245,6 +253,29 @@ NOTE: Using Clang with a `riscv*-linux-gnu` GNU binutils linker has been seen
 to produce broken binaries with missing relocations; it is therefore currently
 recommended that this combination be avoided or *FW_PIC=n* be used to disable
 building OpenSBI as a position-independent binary.
+
+Building with timestamp and compiler info
+-----------------------------------------
+
+When doing development, we may want to know the build time and compiler info
+for debug purpose. OpenSBI can also be built with timestamp and compiler info.
+To build with those info and print it out at boot time, we can just simply add
+`BUILD_INFO=y`, like:
+```
+make BUILD_INFO=y
+```
+
+But if you have used `BUILD_INFO=y`, and want to switch back to `BUILD_INFO=n`,
+you must do
+```
+make clean
+```
+before the next build.
+
+NOTE: Using `BUILD_INFO=y` without specifying SOURCE_DATE_EPOCH will violate
+[reproducible builds]. This definition is ONLY for development and debug
+purpose, and should NOT be used in a product which follows "reproducible
+builds".
 
 Contributing to OpenSBI
 -----------------------
@@ -328,3 +359,4 @@ make I=<install_directory> install_docs
 [Doxygen manual]: http://www.doxygen.nl/manual/index.html
 [Kendryte standalone SDK]: https://github.com/kendryte/kendryte-standalone-sdk
 [third party notices]: ThirdPartyNotices.md
+[reproducible builds]: https://reproducible-builds.org

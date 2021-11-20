@@ -15,6 +15,7 @@
 
 extern struct fdt_serial fdt_serial_uart8250;
 extern struct fdt_serial fdt_serial_sifive;
+extern struct fdt_serial fdt_serial_litex;
 extern struct fdt_serial fdt_serial_htif;
 extern struct fdt_serial fdt_serial_shakti;
 extern struct fdt_serial fdt_serial_gaisler;
@@ -22,6 +23,7 @@ extern struct fdt_serial fdt_serial_gaisler;
 static struct fdt_serial *serial_drivers[] = {
 	&fdt_serial_uart8250,
 	&fdt_serial_sifive,
+	&fdt_serial_litex,
 	&fdt_serial_htif,
 	&fdt_serial_shakti,
 	&fdt_serial_gaisler
@@ -40,7 +42,7 @@ int fdt_serial_init(void)
 	struct fdt_serial *drv;
 	const struct fdt_match *match;
 	int pos, noff = -1, len, coff, rc;
-	void *fdt = sbi_scratch_thishart_arg1_ptr();
+	void *fdt = fdt_get_address();
 
 	/* Find offset of node pointed to by stdout-path */
 	coff = fdt_path_offset(fdt, "/chosen");

@@ -11,6 +11,7 @@
 #include <sbi/sbi_const.h>
 #include <sbi/sbi_hart.h>
 #include <sbi/sbi_platform.h>
+#include <sbi_utils/fdt/fdt_helper.h>
 #include <sbi_utils/fdt/fdt_fixup.h>
 #include <sbi_utils/ipi/aclint_mswi.h>
 #include <sbi_utils/irqchip/plic.h>
@@ -26,6 +27,7 @@
 #define ARIANE_PLIC_NUM_SOURCES			3
 #define ARIANE_HART_COUNT			1
 #define ARIANE_CLINT_ADDR			0x2000000
+#define ARIANE_ACLINT_MTIMER_FREQ		1000000
 #define ARIANE_ACLINT_MSWI_ADDR			(ARIANE_CLINT_ADDR + \
 						 CLINT_MSWI_OFFSET)
 #define ARIANE_ACLINT_MTIMER_ADDR		(ARIANE_CLINT_ADDR + \
@@ -44,8 +46,13 @@ static struct aclint_mswi_data mswi = {
 };
 
 static struct aclint_mtimer_data mtimer = {
-	.addr = ARIANE_ACLINT_MTIMER_ADDR,
-	.size = ACLINT_MTIMER_SIZE,
+	.mtime_freq = ARIANE_ACLINT_MTIMER_FREQ,
+	.mtime_addr = ARIANE_ACLINT_MTIMER_ADDR +
+		      ACLINT_DEFAULT_MTIME_OFFSET,
+	.mtime_size = ACLINT_DEFAULT_MTIME_SIZE,
+	.mtimecmp_addr = ARIANE_ACLINT_MTIMER_ADDR +
+			 ACLINT_DEFAULT_MTIMECMP_OFFSET,
+	.mtimecmp_size = ACLINT_DEFAULT_MTIMECMP_SIZE,
 	.first_hartid = 0,
 	.hart_count = ARIANE_HART_COUNT,
 	.has_64bit_mmio = TRUE,
@@ -70,7 +77,7 @@ static int ariane_final_init(bool cold_boot)
 	if (!cold_boot)
 		return 0;
 
-	fdt = sbi_scratch_thishart_arg1_ptr();
+	fdt = fdt_get_address();
 	fdt_fixups(fdt);
 
 	return 0;

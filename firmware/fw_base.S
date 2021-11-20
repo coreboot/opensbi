@@ -65,14 +65,14 @@ _try_lottery:
 
 	/* Save load address */
 	lla	t0, _load_start
-	lla	t1, _start
+	lla	t1, _fw_start
 	REG_S	t1, 0(t0)
 
 #ifdef FW_PIC
 	/* relocate the global table content */
 	lla	t0, _link_start
 	REG_L	t0, 0(t0)
-	/* t1 shall has the address of _start */
+	/* t1 shall has the address of _fw_start */
 	sub	t2, t1, t0
 	lla	t3, _runtime_offset
 	REG_S	t2, (t3)
@@ -172,7 +172,7 @@ _relocate_copy_to_upper_loop:
 	blt	t0, t1, _relocate_copy_to_upper_loop
 	jr	t4
 _wait_relocate_copy_done:
-	lla	t0, _start
+	lla	t0, _fw_start
 	lla	t1, _link_start
 	REG_L	t1, 0(t1)
 	beq	t0, t1, _wait_for_boot_hart
@@ -349,8 +349,7 @@ _scratch_init:
 	 * previous booting stage.
 	 */
 	beqz	a1, _fdt_reloc_done
-	/* Mask values in a3 and a4 */
-	li	a3, ~(__SIZEOF_POINTER__ - 1)
+	/* Mask values in a4 */
 	li	a4, 0xff
 	/* t1 = destination FDT start address */
 	MOV_3R	s0, a0, s1, a1, s2, a2
@@ -359,10 +358,8 @@ _scratch_init:
 	MOV_3R	a0, s0, a1, s1, a2, s2
 	beqz	t1, _fdt_reloc_done
 	beq	t1, a1, _fdt_reloc_done
-	and	t1, t1, a3
 	/* t0 = source FDT start address */
 	add	t0, a1, zero
-	and	t0, t0, a3
 	/* t2 = source FDT size in big-endian */
 #if __riscv_xlen == 64
 	lwu	t2, 4(t0)
