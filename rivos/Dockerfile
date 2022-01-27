@@ -1,7 +1,7 @@
 # Copyright (c) 2021 by Rivos Inc.
 # Licensed under the BSD 2-Clause License, see LICENSE for details.
 # SPDX-License-Identifier: BSD-2-Clause
-FROM gitlab.ba.rivosinc.com:5050/ext/sw/riscv-gnu-toolchain:latest as riscv_builder
+FROM gitlab.ba.rivosinc.com:5050/rv/sw/ext/riscv-gnu-toolchain/ubuntu.20.04:latest as riscv_builder
 
 COPY . /src/
 WORKDIR /tmp/build
@@ -12,7 +12,7 @@ RUN make -C /src CROSS_COMPILE=riscv64-unknown-linux-gnu- PLATFORM=generic \
          install_firmwares
 
 ### Stage 2: Create a .deb Ubuntu package
-FROM gitlab.ba.rivosinc.com:5050/rv/it/rivos-sdk/packager:latest as opensbi_packager
+FROM gitlab.ba.rivosinc.com:5050/rv/it/int/rivos-sdk/packager:latest as opensbi_packager
 
 COPY --from=riscv_builder /rivos/opensbi /rivos/sysroot/riscv/boot/opensbi
 
