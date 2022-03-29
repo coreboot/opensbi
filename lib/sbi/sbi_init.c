@@ -18,6 +18,7 @@
 #include <sbi/sbi_hartmask.h>
 #include <sbi/sbi_hsm.h>
 #include <sbi/sbi_ipi.h>
+#include <sbi/sbi_irqchip.h>
 #include <sbi/sbi_platform.h>
 #include <sbi/sbi_pmu.h>
 #include <sbi/sbi_system.h>
@@ -165,8 +166,8 @@ static void wait_for_coldboot(struct sbi_scratch *scratch, u32 hartid)
 	/* Save MIE CSR */
 	saved_mie = csr_read(CSR_MIE);
 
-	/* Set MSIE bit to receive IPI */
-	csr_set(CSR_MIE, MIP_MSIP);
+	/* Set MSIE and MEIE bits to receive IPI */
+	csr_set(CSR_MIE, MIP_MSIP | MIP_MEIP);
 
 	/* Acquire coldboot lock */
 	spin_lock(&coldboot_lock);
@@ -182,7 +183,7 @@ static void wait_for_coldboot(struct sbi_scratch *scratch, u32 hartid)
 		do {
 			wfi();
 			cmip = csr_read(CSR_MIP);
-		 } while (!(cmip & MIP_MSIP));
+		 } while (!(cmip & (MIP_MSIP | MIP_MEIP)));
 	};
 
 	/* Acquire coldboot lock */
@@ -270,9 +271,9 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 
 	sbi_boot_print_banner(scratch);
 
-	rc = sbi_platform_irqchip_init(plat, TRUE);
+	rc = sbi_irqchip_init(scratch, TRUE);
 	if (rc) {
-		sbi_printf("%s: platform irqchip init failed (error %d)\n",
+		sbi_printf("%s: irqchip init failed (error %d)\n",
 			   __func__, rc);
 		sbi_hart_hang();
 	}
@@ -373,7 +374,7 @@ static void init_warm_startup(struct sbi_scratch *scratch, u32 hartid)
 	if (rc)
 		sbi_hart_hang();
 
-	rc = sbi_platform_irqchip_init(plat, FALSE);
+	rc = sbi_irqchip_init(scratch, FALSE);
 	if (rc)
 		sbi_hart_hang();
 
@@ -494,6 +495,14 @@ void __noreturn sbi_init(struct sbi_scratch *scratch)
 	if (next_mode_supported && atomic_xchg(&coldboot_lottery, 1) == 0)
 		coldboot = TRUE;
 
+	/*
+	 * Do platform specific nascent (very early) initialization so
+	 * that platform can initialize platform specific per-HART CSRs
+	 * or per-HART devices.
+	 */
+	if (sbi_platform_nascent_init(plat))
+		sbi_hart_hang();
+
 	if (coldboot)
 		init_coldboot(scratch, hartid);
 	else
@@ -542,7 +551,7 @@ void __noreturn sbi_exit(struct sbi_scratch *scratch)
 
 	sbi_ipi_exit(scratch);
 
-	sbi_platform_irqchip_exit(plat);
+	sbi_irqchip_exit(scratch);
 
 	sbi_platform_final_exit(plat);
 

@@ -47,7 +47,7 @@ static u64 mtimer_time_rd32(volatile u64 *addr)
 static void mtimer_time_wr32(bool timecmp, u64 value, volatile u64 *addr)
 {
 	writel_relaxed((timecmp) ? -1U : 0U, (void *)(addr));
-	writel_relaxed((u32)(value >> 32), (void *)(addr) + 0x04);
+	writel_relaxed((u32)(value >> 32), (char *)(addr) + 0x04);
 	writel_relaxed((u32)value, (void *)(addr));
 }
 
@@ -154,7 +154,7 @@ static int aclint_mtimer_add_regions(unsigned long addr, unsigned long size)
 	while (pos < end) {
 		rsize = pos & (MTIMER_ADD_REGION_ALIGN - 1);
 		if (rsize)
-			rsize = 1UL << __ffs(pos);
+			rsize = 1UL << sbi_ffs(pos);
 		else
 			rsize = ((end - pos) < MTIMER_ADD_REGION_ALIGN) ?
 				(end - pos) : MTIMER_ADD_REGION_ALIGN;

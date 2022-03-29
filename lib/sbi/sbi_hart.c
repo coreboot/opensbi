@@ -40,6 +40,9 @@ static unsigned long hart_features_offset;
 static void mstatus_init(struct sbi_scratch *scratch)
 {
 	unsigned long mstatus_val = 0;
+	int cidx;
+	unsigned int num_mhpm = sbi_hart_mhpm_count(scratch);
+	uint64_t mhpmevent_init_val = 0;
 
 	/* Enable FPU */
 	if (misa_extension('D') || misa_extension('F'))
@@ -68,6 +71,21 @@ static void mstatus_init(struct sbi_scratch *scratch)
 	if (sbi_hart_has_feature(scratch, SBI_HART_HAS_MCOUNTINHIBIT))
 		csr_write(CSR_MCOUNTINHIBIT, 0xFFFFFFF8);
 
+	/**
+	 * The mhpmeventn[h] CSR should be initialized with interrupt disabled
+	 * and inhibited running in M-mode during init.
+	 * To keep it simple, only contiguous mhpmcounters are supported as a
+	 * platform with discontiguous mhpmcounters may not make much sense.
+	 */
+	mhpmevent_init_val |= (MHPMEVENT_OF | MHPMEVENT_MINH);
+	for (cidx = 0; cidx < num_mhpm; cidx++) {
+#if __riscv_xlen == 32
+		csr_write_num(CSR_MHPMEVENT3 + cidx, mhpmevent_init_val & 0xFFFFFFFF);
+		csr_write_num(CSR_MHPMEVENT3H + cidx, mhpmevent_init_val >> BITS_PER_LONG);
+#else
+		csr_write_num(CSR_MHPMEVENT3 + cidx, mhpmevent_init_val);
+#endif
+	}
 	/* Disable all interrupts */
 	csr_write(CSR_MIE, 0);
 
@@ -226,7 +244,7 @@ int sbi_hart_pmp_configure(struct sbi_scratch *scratch)
 			pmp_set(pmp_idx++, pmp_flags, reg->base, reg->order);
 		else {
 			sbi_printf("Can not configure pmp for domain %s", dom->name);
-			sbi_printf("because memory region address %lx or size %lx is not in range\n",
+			sbi_printf(" because memory region address %lx or size %lx is not in range\n",
 				    reg->base, reg->order);
 		}
 	}
@@ -282,6 +300,9 @@ static inline char *sbi_hart_feature_id2string(unsigned long feature)
 		break;
 	case SBI_HART_HAS_TIME:
 		fstr = "time";
+		break;
+	case SBI_HART_HAS_AIA:
+		fstr = "aia";
 		break;
 	default:
 		break;
@@ -368,7 +389,7 @@ static int hart_pmu_get_allowed_bits(void)
 		if (trap.cause)
 			return 0;
 	}
-	num_bits = __fls(val) + 1;
+	num_bits = sbi_fls(val) + 1;
 #if __riscv_xlen == 32
 	csr_write_allowed(CSR_MHPMCOUNTER3H, (ulong)&trap, val);
 	if (!trap.cause) {
@@ -376,7 +397,7 @@ static int hart_pmu_get_allowed_bits(void)
 		if (trap.cause)
 			return num_bits;
 	}
-	num_bits += __fls(val) + 1;
+	num_bits += sbi_fls(val) + 1;
 
 #endif
 
@@ -439,8 +460,8 @@ static void hart_detect_features(struct sbi_scratch *scratch)
 	 */
 	val = hart_pmp_get_allowed_addr();
 	if (val) {
-		hfeatures->pmp_gran =  1 << (__ffs(val) + 2);
-		hfeatures->pmp_addr_bits = __fls(val) + 1;
+		hfeatures->pmp_gran =  1 << (sbi_ffs(val) + 2);
+		hfeatures->pmp_addr_bits = sbi_fls(val) + 1;
 		/* Detect number of PMP regions. At least PMPADDR0 should be implemented*/
 		__check_csr_64(CSR_PMPADDR0, 0, val, pmp_count, __pmp_skip);
 	}
@@ -506,6 +527,14 @@ __mhpm_skip:
 	csr_read_allowed(CSR_TIME, (unsigned long)&trap);
 	if (!trap.cause)
 		hfeatures->features |= SBI_HART_HAS_TIME;
+
+	/* Detect if hart has AIA local interrupt CSRs */
+	csr_read_allowed(CSR_MTOPI, (unsigned long)&trap);
+	if (trap.cause)
+		goto __aia_skip;
+	hfeatures->features |= SBI_HART_HAS_AIA;
+__aia_skip:
+	return;
 }
 
 int sbi_hart_reinit(struct sbi_scratch *scratch)

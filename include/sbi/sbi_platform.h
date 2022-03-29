@@ -64,6 +64,9 @@ enum sbi_platform_features {
 
 /** Platform functions */
 struct sbi_platform_operations {
+	/* Platform nascent initialization */
+	int (*nascent_init)(void);
+
 	/** Platform early initialization */
 	int (*early_init)(bool cold_boot);
 	/** Platform final initialization */
@@ -171,6 +174,56 @@ struct sbi_platform {
 	 */
 	const u32 *hart_index2id;
 };
+
+/**
+ * Prevent modification of struct sbi_platform from affecting
+ * SBI_PLATFORM_xxx_OFFSET
+ */
+_Static_assert(
+	offsetof(struct sbi_platform, opensbi_version)
+		== SBI_PLATFORM_OPENSBI_VERSION_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_OPENSBI_VERSION_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, platform_version)
+		== SBI_PLATFORM_VERSION_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_VERSION_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, name)
+		== SBI_PLATFORM_NAME_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_NAME_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, features)
+		== SBI_PLATFORM_FEATURES_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_FEATURES_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, hart_count)
+		== SBI_PLATFORM_HART_COUNT_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_HART_COUNT_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, hart_stack_size)
+		== SBI_PLATFORM_HART_STACK_SIZE_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_HART_STACK_SIZE_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, platform_ops_addr)
+		== SBI_PLATFORM_OPS_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_OPS_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, firmware_context)
+		== SBI_PLATFORM_FIRMWARE_CONTEXT_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_FIRMWARE_CONTEXT_OFFSET");
+_Static_assert(
+	offsetof(struct sbi_platform, hart_index2id)
+		== SBI_PLATFORM_HART_INDEX2ID_OFFSET,
+	"struct sbi_platform definition has changed, please redefine "
+	"SBI_PLATFORM_HART_INDEX2ID_OFFSET");
 
 /** Get pointer to sbi_platform for sbi_scratch pointer */
 #define sbi_platform_ptr(__s) \
@@ -297,6 +350,23 @@ static inline bool sbi_platform_hart_invalid(const struct sbi_platform *plat,
 	if (plat->hart_count <= sbi_platform_hart_index(plat, hartid))
 		return TRUE;
 	return FALSE;
+}
+
+/**
+ * Nascent (very early) initialization for current HART
+ *
+ * NOTE: This function can be used to do very early initialization of
+ * platform specific per-HART CSRs and devices.
+ *
+ * @param plat pointer to struct sbi_platform
+ *
+ * @return 0 on success and negative error code on failure
+ */
+static inline int sbi_platform_nascent_init(const struct sbi_platform *plat)
+{
+	if (plat && sbi_platform_ops(plat)->nascent_init)
+		return sbi_platform_ops(plat)->nascent_init();
+	return 0;
 }
 
 /**

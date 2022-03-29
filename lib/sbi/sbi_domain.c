@@ -159,7 +159,7 @@ static bool is_region_subset(const struct sbi_domain_memregion *regA,
 	ulong regA_start = regA->base;
 	ulong regA_end = regA->base + (BIT(regA->order) - 1);
 	ulong regB_start = regB->base;
-	ulong regB_end = regB->base + (BIT(regA->order) - 1);
+	ulong regB_end = regB->base + (BIT(regB->order) - 1);
 
 	if ((regB_start <= regA_start) &&
 	    (regA_start < regB_end) &&
@@ -295,7 +295,7 @@ static int sanitize_domain(const struct sbi_platform *plat,
 	/* Check next address and next mode*/
 	if (!sbi_domain_check_addr(dom, dom->next_addr, dom->next_mode,
 				   SBI_DOMAIN_EXECUTE)) {
-		sbi_printf("%s: %s next booting stage addres 0x%lx can't "
+		sbi_printf("%s: %s next booting stage address 0x%lx can't "
 			   "execute\n", __func__, dom->name, dom->next_addr);
 		return SBI_EINVAL;
 	}
@@ -471,8 +471,12 @@ int sbi_domain_root_add_memregion(const struct sbi_domain_memregion *reg)
 
 	/* Check for conflicts */
 	sbi_domain_for_each_memregion(&root, nreg) {
-		if (is_region_conflict(reg, nreg))
-			return SBI_EINVAL;
+		if (is_region_conflict(reg, nreg)) {
+			sbi_printf("%s: is_region_conflict check failed"
+			" 0x%lx conflicts existing 0x%lx\n", __func__,
+				   reg->base, nreg->base);
+			return SBI_EALREADY;
+		}
 	}
 
 	/* Append the memregion to root memregions */

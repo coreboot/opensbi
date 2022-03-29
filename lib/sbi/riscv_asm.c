@@ -76,7 +76,8 @@ void misa_string(int xlen, char *out, unsigned int out_sz)
 			out[pos++] = '8';
 			break;
 		default:
-			BUG();
+			sbi_panic("%s: Unknown misa.MXL encoding %d",
+				   __func__, xlen);
 			return;
 		}
 	}
@@ -145,7 +146,7 @@ unsigned long csr_read_num(int csr_num)
 #endif
 
 	default:
-		BUG();
+		sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
 		break;
 	};
 
@@ -213,7 +214,7 @@ void csr_write_num(int csr_num, unsigned long val)
 	switchcase_csr_write_16(CSR_MHPMEVENT16, val)
 
 	default:
-		BUG();
+		sbi_panic("%s: Unknown CSR %#x", __func__, csr_num);
 		break;
 	};
 
@@ -260,12 +261,9 @@ int pmp_set(unsigned int n, unsigned long prot, unsigned long addr,
 	pmpcfg_csr   = (CSR_PMPCFG0 + (n >> 2)) & ~1;
 	pmpcfg_shift = (n & 7) << 3;
 #else
-	pmpcfg_csr   = -1;
-	pmpcfg_shift = -1;
+# error "Unexpected __riscv_xlen"
 #endif
 	pmpaddr_csr = CSR_PMPADDR0 + n;
-	if (pmpcfg_csr < 0 || pmpcfg_shift < 0)
-		return SBI_ENOTSUPP;
 
 	/* encode PMP config */
 	prot &= ~PMP_A;
@@ -314,12 +312,9 @@ int pmp_get(unsigned int n, unsigned long *prot_out, unsigned long *addr_out,
 	pmpcfg_csr   = (CSR_PMPCFG0 + (n >> 2)) & ~1;
 	pmpcfg_shift = (n & 7) << 3;
 #else
-	pmpcfg_csr   = -1;
-	pmpcfg_shift = -1;
+# error "Unexpected __riscv_xlen"
 #endif
 	pmpaddr_csr = CSR_PMPADDR0 + n;
-	if (pmpcfg_csr < 0 || pmpcfg_shift < 0)
-		return SBI_ENOTSUPP;
 
 	/* decode PMP config */
 	cfgmask = (0xffUL << pmpcfg_shift);
