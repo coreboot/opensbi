@@ -25,7 +25,7 @@
 #define MSTATUS_MPP			(_UL(3) << MSTATUS_MPP_SHIFT)
 #define MSTATUS_FS			_UL(0x00006000)
 #define MSTATUS_XS			_UL(0x00018000)
-#define MSTATUS_VS			_UL(0x01800000)
+#define MSTATUS_VS			_UL(0x00000600)
 #define MSTATUS_MPRV			_UL(0x00020000)
 #define MSTATUS_SUM			_UL(0x00040000)
 #define MSTATUS_MXR			_UL(0x00080000)
@@ -203,6 +203,22 @@
 
 #define MHPMEVENT_SSCOF_MASK		_ULL(0xFFFF000000000000)
 
+#if __riscv_xlen > 32
+#define ENVCFG_STCE			(_ULL(1) << 63)
+#define ENVCFG_PBMTE			(_ULL(1) << 62)
+#else
+#define ENVCFGH_STCE			(_UL(1) << 31)
+#define ENVCFGH_PBMTE			(_UL(1) << 30)
+#endif
+#define ENVCFG_CBZE			(_UL(1) << 7)
+#define ENVCFG_CBCFE			(_UL(1) << 6)
+#define ENVCFG_CBIE_SHIFT		4
+#define ENVCFG_CBIE			(_UL(0x3) << ENVCFG_CBIE_SHIFT)
+#define ENVCFG_CBIE_ILL			_UL(0x0)
+#define ENVCFG_CBIE_FLUSH		_UL(0x1)
+#define ENVCFG_CBIE_INV			_UL(0x3)
+#define ENVCFG_FIOM			_UL(0x1)
+
 /* ===== User-level CSRs ===== */
 
 /* User Trap Setup (N-extension) */
@@ -298,12 +314,19 @@
 #define CSR_STVEC			0x105
 #define CSR_SCOUNTEREN			0x106
 
+/* Supervisor Configuration */
+#define CSR_SENVCFG			0x10a
+
 /* Supervisor Trap Handling */
 #define CSR_SSCRATCH			0x140
 #define CSR_SEPC			0x141
 #define CSR_SCAUSE			0x142
 #define CSR_STVAL			0x143
 #define CSR_SIP				0x144
+
+/* Sstc extension */
+#define CSR_STIMECMP			0x14D
+#define CSR_STIMECMPH			0x15D
 
 /* Supervisor Protection and Translation */
 #define CSR_SATP			0x180
@@ -326,6 +349,12 @@
 #define CSR_SIEH			0x114
 #define CSR_SIPH			0x154
 
+/* Supervisor stateen CSRs */
+#define CSR_SSTATEEN0			0x10C
+#define CSR_SSTATEEN1			0x10D
+#define CSR_SSTATEEN2			0x10E
+#define CSR_SSTATEEN3			0x10F
+
 /* ===== Hypervisor-level CSRs ===== */
 
 /* Hypervisor Trap Setup (H-extension) */
@@ -335,6 +364,10 @@
 #define CSR_HIE				0x604
 #define CSR_HCOUNTEREN			0x606
 #define CSR_HGEIE			0x607
+
+/* Hypervisor Configuration */
+#define CSR_HENVCFG			0x60a
+#define CSR_HENVCFGH			0x61a
 
 /* Hypervisor Trap Handling (H-extension) */
 #define CSR_HTVAL			0x643
@@ -390,6 +423,16 @@
 #define CSR_VSIEH			0x214
 #define CSR_VSIPH			0x254
 
+/* Hypervisor stateen CSRs */
+#define CSR_HSTATEEN0			0x60C
+#define CSR_HSTATEEN0H			0x61C
+#define CSR_HSTATEEN1			0x60D
+#define CSR_HSTATEEN1H			0x61D
+#define CSR_HSTATEEN2			0x60E
+#define CSR_HSTATEEN2H			0x61E
+#define CSR_HSTATEEN3			0x60F
+#define CSR_HSTATEEN3H			0x61F
+
 /* ===== Machine-level CSRs ===== */
 
 /* Machine Information Registers */
@@ -407,6 +450,10 @@
 #define CSR_MTVEC			0x305
 #define CSR_MCOUNTEREN			0x306
 #define CSR_MSTATUSH			0x310
+
+/* Machine Configuration */
+#define CSR_MENVCFG			0x30a
+#define CSR_MENVCFGH			0x31a
 
 /* Machine Trap Handling */
 #define CSR_MSCRATCH			0x340
@@ -659,6 +706,17 @@
 #define CSR_MVIEN			0x308
 #define CSR_MVIP			0x309
 
+/* Smstateen extension registers */
+/* Machine stateen CSRs */
+#define CSR_MSTATEEN0			0x30C
+#define CSR_MSTATEEN0H			0x31C
+#define CSR_MSTATEEN1			0x30D
+#define CSR_MSTATEEN1H			0x31D
+#define CSR_MSTATEEN2			0x30E
+#define CSR_MSTATEEN2H			0x31E
+#define CSR_MSTATEEN3			0x30F
+#define CSR_MSTATEEN3H			0x31F
+
 /* Machine-Level High-Half CSRs (AIA) */
 #define CSR_MIDELEGH			0x313
 #define CSR_MIEH			0x314
@@ -687,6 +745,23 @@
 #define CAUSE_LOAD_GUEST_PAGE_FAULT	0x15
 #define CAUSE_VIRTUAL_INST_FAULT	0x16
 #define CAUSE_STORE_GUEST_PAGE_FAULT	0x17
+
+/* Common defines for all smstateen */
+#define SMSTATEEN_MAX_COUNT		4
+#define SMSTATEEN0_CS_SHIFT		0
+#define SMSTATEEN0_CS			(_ULL(1) << SMSTATEEN0_CS_SHIFT)
+#define SMSTATEEN0_FCSR_SHIFT		1
+#define SMSTATEEN0_FCSR			(_ULL(1) << SMSTATEEN0_FCSR_SHIFT)
+#define SMSTATEEN0_IMSIC_SHIFT		58
+#define SMSTATEEN0_IMSIC		(_ULL(1) << SMSTATEEN0_IMSIC_SHIFT)
+#define SMSTATEEN0_AIA_SHIFT		59
+#define SMSTATEEN0_AIA			(_ULL(1) << SMSTATEEN0_AIA_SHIFT)
+#define SMSTATEEN0_SVSLCT_SHIFT		60
+#define SMSTATEEN0_SVSLCT		(_ULL(1) << SMSTATEEN0_SVSLCT_SHIFT)
+#define SMSTATEEN0_HSENVCFG_SHIFT	62
+#define SMSTATEEN0_HSENVCFG		(_ULL(1) << SMSTATEEN0_HSENVCFG_SHIFT)
+#define SMSTATEEN_STATEN_SHIFT		63
+#define SMSTATEEN_STATEN		(_ULL(1) << SMSTATEEN_STATEN_SHIFT)
 
 /* ===== Instruction Encodings ===== */
 

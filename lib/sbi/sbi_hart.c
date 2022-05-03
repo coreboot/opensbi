@@ -39,10 +39,11 @@ static unsigned long hart_features_offset;
 
 static void mstatus_init(struct sbi_scratch *scratch)
 {
-	unsigned long mstatus_val = 0;
+	unsigned long menvcfg_val, mstatus_val = 0;
 	int cidx;
 	unsigned int num_mhpm = sbi_hart_mhpm_count(scratch);
 	uint64_t mhpmevent_init_val = 0;
+	uint64_t mstateen_val;
 
 	/* Enable FPU */
 	if (misa_extension('D') || misa_extension('F'))
@@ -81,11 +82,92 @@ static void mstatus_init(struct sbi_scratch *scratch)
 	for (cidx = 0; cidx < num_mhpm; cidx++) {
 #if __riscv_xlen == 32
 		csr_write_num(CSR_MHPMEVENT3 + cidx, mhpmevent_init_val & 0xFFFFFFFF);
-		csr_write_num(CSR_MHPMEVENT3H + cidx, mhpmevent_init_val >> BITS_PER_LONG);
+		if (sbi_hart_has_feature(scratch, SBI_HART_HAS_SSCOFPMF))
+			csr_write_num(CSR_MHPMEVENT3H + cidx,
+				      mhpmevent_init_val >> BITS_PER_LONG);
 #else
 		csr_write_num(CSR_MHPMEVENT3 + cidx, mhpmevent_init_val);
 #endif
 	}
+
+	if (sbi_hart_has_feature(scratch, SBI_HART_HAS_SMSTATEEN)) {
+		mstateen_val = csr_read(CSR_MSTATEEN0);
+#if __riscv_xlen == 32
+		mstateen_val |= ((uint64_t)csr_read(CSR_MSTATEEN0H)) << 32;
+#endif
+		mstateen_val |= SMSTATEEN_STATEN;
+		if (sbi_hart_has_feature(scratch, SBI_HART_HAS_MENVCFG))
+			mstateen_val |= SMSTATEEN0_HSENVCFG;
+		else
+			mstateen_val &= ~SMSTATEEN0_HSENVCFG;
+		if (sbi_hart_has_feature(scratch, SBI_HART_HAS_AIA))
+			mstateen_val |= (SMSTATEEN0_AIA | SMSTATEEN0_SVSLCT |
+					SMSTATEEN0_IMSIC);
+		else
+			mstateen_val &= ~(SMSTATEEN0_AIA | SMSTATEEN0_SVSLCT |
+					SMSTATEEN0_IMSIC);
+		csr_write(CSR_MSTATEEN0, mstateen_val);
+#if __riscv_xlen == 32
+		csr_write(CSR_MSTATEEN0H, mstateen_val >> 32);
+#endif
+	}
+
+	if (sbi_hart_has_feature(scratch, SBI_HART_HAS_MENVCFG)) {
+		menvcfg_val = csr_read(CSR_MENVCFG);
+
+		/*
+		 * Set menvcfg.CBZE == 1
+		 *
+		 * If Zicboz extension is not available then writes to
+		 * menvcfg.CBZE will be ignored because it is a WARL field.
+		 */
+		menvcfg_val |= ENVCFG_CBZE;
+
+		/*
+		 * Set menvcfg.CBCFE == 1
+		 *
+		 * If Zicbom extension is not available then writes to
+		 * menvcfg.CBCFE will be ignored because it is a WARL field.
+		 */
+		menvcfg_val |= ENVCFG_CBCFE;
+
+		/*
+		 * Set menvcfg.CBIE == 3
+		 *
+		 * If Zicbom extension is not available then writes to
+		 * menvcfg.CBIE will be ignored because it is a WARL field.
+		 */
+		menvcfg_val |= ENVCFG_CBIE_INV << ENVCFG_CBIE_SHIFT;
+
+		/*
+		 * Set menvcfg.PBMTE == 1 for RV64 or RV128
+		 *
+		 * If Svpbmt extension is not available then menvcfg.PBMTE
+		 * will be read-only zero.
+		 */
+#if __riscv_xlen > 32
+		menvcfg_val |= ENVCFG_PBMTE;
+#endif
+
+		/*
+		 * The spec doesn't explicitly describe the reset value of menvcfg.
+		 * Enable access to stimecmp if sstc extension is present in the
+		 * hardware.
+		 */
+		if (sbi_hart_has_feature(scratch, SBI_HART_HAS_SSTC)) {
+#if __riscv_xlen == 32
+			unsigned long menvcfgh_val;
+			menvcfgh_val = csr_read(CSR_MENVCFGH);
+			menvcfgh_val |= ENVCFGH_STCE;
+			csr_write(CSR_MENVCFGH, menvcfgh_val);
+#else
+			menvcfg_val |= ENVCFG_STCE;
+#endif
+		}
+
+		csr_write(CSR_MENVCFG, menvcfg_val);
+	}
+
 	/* Disable all interrupts */
 	csr_write(CSR_MIE, 0);
 
@@ -303,6 +385,14 @@ static inline char *sbi_hart_feature_id2string(unsigned long feature)
 		break;
 	case SBI_HART_HAS_AIA:
 		fstr = "aia";
+	case SBI_HART_HAS_SSTC:
+		fstr = "sstc";
+		break;
+	case SBI_HART_HAS_MENVCFG:
+		fstr = "menvcfg";
+		break;
+	case SBI_HART_HAS_SMSTATEEN:
+		fstr = "smstateen";
 		break;
 	default:
 		break;
@@ -408,7 +498,7 @@ static void hart_detect_features(struct sbi_scratch *scratch)
 {
 	struct sbi_trap_info trap = {0};
 	struct hart_features *hfeatures;
-	unsigned long val;
+	unsigned long val, oldval;
 
 	/* Reset hart features */
 	hfeatures = sbi_scratch_offset_ptr(scratch, hart_features_offset);
@@ -417,14 +507,14 @@ static void hart_detect_features(struct sbi_scratch *scratch)
 	hfeatures->mhpm_count = 0;
 
 #define __check_csr(__csr, __rdonly, __wrval, __field, __skip)	\
-	val = csr_read_allowed(__csr, (ulong)&trap);			\
+	oldval = csr_read_allowed(__csr, (ulong)&trap);			\
 	if (!trap.cause) {						\
 		if (__rdonly) {						\
 			(hfeatures->__field)++;				\
 		} else {						\
 			csr_write_allowed(__csr, (ulong)&trap, __wrval);\
 			if (!trap.cause) {				\
-				if (csr_swap(__csr, val) == __wrval)	\
+				if (csr_swap(__csr, oldval) == __wrval)	\
 					(hfeatures->__field)++;		\
 				else					\
 					goto __skip;			\
@@ -534,6 +624,27 @@ __mhpm_skip:
 		goto __aia_skip;
 	hfeatures->features |= SBI_HART_HAS_AIA;
 __aia_skip:
+
+	/* Detect if hart has menvcfg CSR */
+	csr_read_allowed(CSR_MENVCFG, (unsigned long)&trap);
+	if (!trap.cause)
+		hfeatures->features |= SBI_HART_HAS_MENVCFG;
+
+	/**
+	 * Detect if hart supports stimecmp CSR(Sstc extension) and menvcfg is
+	 * implemented.
+	 */
+	if (hfeatures->features & SBI_HART_HAS_MENVCFG) {
+		csr_read_allowed(CSR_STIMECMP, (unsigned long)&trap);
+		if (!trap.cause)
+			hfeatures->features |= SBI_HART_HAS_SSTC;
+	}
+
+	/* Detect if hart supports mstateen CSRs */
+	val = csr_read_allowed(CSR_MSTATEEN0, (unsigned long)&trap);
+	if (!trap.cause)
+		hfeatures->features |= SBI_HART_HAS_SMSTATEEN;
+
 	return;
 }
 
