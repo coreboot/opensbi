@@ -139,10 +139,12 @@ static void sbi_boot_print_hart(struct sbi_scratch *scratch, u32 hartid)
 	/* Boot HART details */
 	sbi_printf("Boot HART ID              : %u\n", hartid);
 	sbi_printf("Boot HART Domain          : %s\n", dom->name);
+	sbi_hart_get_priv_version_str(scratch, str, sizeof(str));
+	sbi_printf("Boot HART Priv Version    : %s\n", str);
 	misa_string(xlen, str, sizeof(str));
-	sbi_printf("Boot HART ISA             : %s\n", str);
-	sbi_hart_get_features_str(scratch, str, sizeof(str));
-	sbi_printf("Boot HART Features        : %s\n", str);
+	sbi_printf("Boot HART Base ISA        : %s\n", str);
+	sbi_hart_get_extensions_str(scratch, str, sizeof(str));
+	sbi_printf("Boot HART ISA Extensions  : %s\n", str);
 	sbi_printf("Boot HART PMP Count       : %d\n",
 		   sbi_hart_pmp_count(scratch));
 	sbi_printf("Boot HART PMP Granularity : %lu\n",

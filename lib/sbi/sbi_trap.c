@@ -99,17 +99,14 @@ int sbi_trap_redirect(struct sbi_trap_regs *regs,
 	if (prev_mode != PRV_S && prev_mode != PRV_U)
 		return SBI_ENOTSUPP;
 
-	/* For certain exceptions from VS/VU-mode we redirect to VS-mode */
+	/* If exceptions came from VS/VU-mode, redirect to VS-mode if
+	 * delegated in hedeleg
+	 */
 	if (misa_extension('H') && prev_virt) {
-		switch (trap->cause) {
-		case CAUSE_FETCH_PAGE_FAULT:
-		case CAUSE_LOAD_PAGE_FAULT:
-		case CAUSE_STORE_PAGE_FAULT:
+		if ((trap->cause < __riscv_xlen) &&
+		    (csr_read(CSR_HEDELEG) & BIT(trap->cause))) {
 			next_virt = TRUE;
-			break;
-		default:
-			break;
-		};
+		}
 	}
 
 	/* Update MSTATUS MPV bits */
@@ -272,8 +269,8 @@ struct sbi_trap_regs *sbi_trap_handler(struct sbi_trap_regs *regs)
 	}
 
 	if (mcause & (1UL << (__riscv_xlen - 1))) {
-		if (sbi_hart_has_feature(sbi_scratch_thishart_ptr(),
-					 SBI_HART_HAS_AIA))
+		if (sbi_hart_has_extension(sbi_scratch_thishart_ptr(),
+					   SBI_HART_EXT_AIA))
 			rc = sbi_trap_aia_irq(regs, mcause);
 		else
 			rc = sbi_trap_nonaia_irq(regs, mcause);

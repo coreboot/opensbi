@@ -15,7 +15,7 @@
 
 struct fdt_match {
 	const char *compatible;
-	void *data;
+	const void *data;
 };
 
 #define FDT_MAX_PHANDLE_ARGS 16
@@ -48,9 +48,11 @@ int fdt_parse_phandle_with_args(void *fdt, int nodeoff,
 int fdt_get_node_addr_size(void *fdt, int node, int index,
 			   uint64_t *addr, uint64_t *size);
 
+bool fdt_node_is_enabled(void *fdt, int nodeoff);
+
 int fdt_parse_hart_id(void *fdt, int cpu_offset, u32 *hartid);
 
-int fdt_parse_max_hart_id(void *fdt, u32 *max_hartid);
+int fdt_parse_max_enabled_hart_id(void *fdt, u32 *max_hartid);
 
 int fdt_parse_timebase_frequency(void *fdt, unsigned long *freq);
 

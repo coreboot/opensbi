@@ -24,13 +24,9 @@
 #include <sbi_utils/ipi/fdt_ipi.h>
 #include <sbi_utils/reset/fdt_reset.h>
 
-extern const struct platform_override sifive_fu540;
-extern const struct platform_override sifive_fu740;
-
-static const struct platform_override *special_platforms[] = {
-	&sifive_fu540,
-	&sifive_fu740,
-};
+/* List of platform override modules generated at compile time */
+extern const struct platform_override *platform_override_modules[];
+extern unsigned long platform_override_modules_size;
 
 static const struct platform_override *generic_plat = NULL;
 static const struct fdt_match *generic_plat_match = NULL;
@@ -41,8 +37,8 @@ static void fw_platform_lookup_special(void *fdt, int root_offset)
 	const struct platform_override *plat;
 	const struct fdt_match *match;
 
-	for (pos = 0; pos < array_size(special_platforms); pos++) {
-		plat = special_platforms[pos];
+	for (pos = 0; pos < platform_override_modules_size; pos++) {
+		plat = platform_override_modules[pos];
 		if (!plat->match_table)
 			continue;
 
@@ -107,6 +103,9 @@ unsigned long fw_platform_init(unsigned long arg0, unsigned long arg1,
 		if (SBI_HARTMASK_MAX_BITS <= hartid)
 			continue;
 
+		if (!fdt_node_is_enabled(fdt, cpu_offset))
+			continue;
+
 		generic_hart_index2id[hart_count++] = hartid;
 	}
 
@@ -167,6 +166,29 @@ static int generic_final_init(bool cold_boot)
 	}
 
 	return 0;
+}
+
+static int generic_vendor_ext_check(long extid)
+{
+	if (generic_plat && generic_plat->vendor_ext_check)
+		return generic_plat->vendor_ext_check(extid,
+						      generic_plat_match);
+
+	return 0;
+}
+
+static int generic_vendor_ext_provider(long extid, long funcid,
+				       const struct sbi_trap_regs *regs,
+				       unsigned long *out_value,
+				       struct sbi_trap_info *out_trap)
+{
+	if (generic_plat && generic_plat->vendor_ext_provider) {
+		return generic_plat->vendor_ext_provider(extid, funcid, regs,
+							 out_value, out_trap,
+							 generic_plat_match);
+	}
+
+	return SBI_ENOTSUPP;
 }
 
 static void generic_early_exit(void)
@@ -237,12 +259,16 @@ const struct sbi_platform_operations platform_ops = {
 	.get_tlbr_flush_limit	= generic_tlbr_flush_limit,
 	.timer_init		= fdt_timer_init,
 	.timer_exit		= fdt_timer_exit,
+	.vendor_ext_check	= generic_vendor_ext_check,
+	.vendor_ext_provider	= generic_vendor_ext_provider,
 };
 
 struct sbi_platform platform = {
 	.opensbi_version	= OPENSBI_VERSION,
-	.platform_version	= SBI_PLATFORM_VERSION(0x0, 0x01),
-	.name			= "Generic",
+	.platform_version	=
+		SBI_PLATFORM_VERSION(CONFIG_PLATFORM_GENERIC_MAJOR_VER,
+				     CONFIG_PLATFORM_GENERIC_MINOR_VER),
+	.name			= CONFIG_PLATFORM_GENERIC_NAME,
 	.features		= SBI_PLATFORM_DEFAULT_FEATURES,
 	.hart_count		= SBI_HARTMASK_MAX_BITS,
 	.hart_index2id		= generic_hart_index2id,
