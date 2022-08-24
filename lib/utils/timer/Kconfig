@@ -28,5 +28,7 @@ config TIMER_MTIMER
 config TIMER_PLMT
 	bool "Andes PLMT support"
 	default n
+config RIVOS_TIMER
+	bool "Rivos TIMER support"
 
 endmenu

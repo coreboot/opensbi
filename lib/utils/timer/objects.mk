@@ -9,6 +9,7 @@
 
 libsbiutils-objs-$(CONFIG_TIMER_MTIMER) += timer/aclint_mtimer.o
 libsbiutils-objs-$(CONFIG_TIMER_PLMT) += timer/andes_plmt.o
+libsbiutils-objs-$(CONFIG_RIVOS_TIMER) += timer/rivos_timer.o
 
 libsbiutils-objs-$(CONFIG_FDT_TIMER) += timer/fdt_timer.o
 libsbiutils-objs-$(CONFIG_FDT_TIMER) += timer/fdt_timer_drivers.o

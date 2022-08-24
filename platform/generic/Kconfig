@@ -54,4 +54,9 @@ config PLATFORM_STARFIVE_JH7110
 
 source "$(OPENSBI_SRC_DIR)/platform/generic/andes/Kconfig"
 
+config PLATFORM_RIVOS_P1
+	bool "RIVOS TEST PLATFORM P1 support"
+	select RIVOS_TIMER
+	default n
+
 endif
