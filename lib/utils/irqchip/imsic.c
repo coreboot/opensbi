@@ -225,7 +225,7 @@ int imsic_warm_irqchip_init(void)
 int imsic_data_check(struct imsic_data *imsic)
 {
 	u32 i, tmp;
-	unsigned long base_addr, addr, mask;
+	unsigned long base_addr, mask;
 
 	/* Sanity checks */
 	if (!imsic ||
@@ -266,7 +266,7 @@ int imsic_data_check(struct imsic_data *imsic)
 	if (!imsic->regs[0].size)
 		return SBI_EINVAL;
 
-	/* Match patter of each regset */
+	/* Match pattern of each regset */
 	base_addr = imsic->regs[0].addr;
 	base_addr &= ~((1UL << (imsic->guest_index_bits +
 				 imsic->hart_index_bits +
@@ -277,15 +277,6 @@ int imsic_data_check(struct imsic_data *imsic)
 		mask = (1UL << imsic->guest_index_bits) * IMSIC_MMIO_PAGE_SZ;
 		mask -= 1UL;
 		if (imsic->regs[i].size & mask)
-			return SBI_EINVAL;
-
-		addr = imsic->regs[i].addr;
-		addr &= ~((1UL << (imsic->guest_index_bits +
-					 imsic->hart_index_bits +
-					 IMSIC_MMIO_PAGE_SHIFT)) - 1);
-		addr &= ~(((1UL << imsic->group_index_bits) - 1) <<
-				imsic->group_index_shift);
-		if (base_addr != addr)
 			return SBI_EINVAL;
 	}
 
