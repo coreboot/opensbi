@@ -12,17 +12,22 @@
 #include <sbi/sbi_hart.h>
 #include <sbi/sbi_platform.h>
 #include <sbi/sbi_scratch.h>
+#include <sbi/sbi_string.h>
+
+#define CONSOLE_TBUF_MAX 256
 
 static const struct sbi_console_device *console_dev = NULL;
+static char console_tbuf[CONSOLE_TBUF_MAX];
+static u32 console_tbuf_len;
 static spinlock_t console_out_lock	       = SPIN_LOCK_INITIALIZER;
 
 bool sbi_isprintable(char c)
 {
 	if (((31 < c) && (c < 127)) || (c == '\f') || (c == '\r') ||
 	    (c == '\n') || (c == '\t')) {
-		return TRUE;
+		return true;
 	}
-	return FALSE;
+	return false;
 }
 
 int sbi_getc(void)
@@ -41,14 +46,47 @@ void sbi_putc(char ch)
 	}
 }
 
+static unsigned long nputs(const char *str, unsigned long len)
+{
+	unsigned long i, ret;
+
+	if (console_dev && console_dev->console_puts) {
+		ret = console_dev->console_puts(str, len);
+	} else {
+		for (i = 0; i < len; i++)
+			sbi_putc(str[i]);
+		ret = len;
+	}
+
+	return ret;
+}
+
+static void nputs_all(const char *str, unsigned long len)
+{
+	unsigned long p = 0;
+
+	while (p < len)
+		p += nputs(&str[p], len - p);
+}
+
 void sbi_puts(const char *str)
 {
+	unsigned long len = sbi_strlen(str);
+
 	spin_lock(&console_out_lock);
-	while (*str) {
-		sbi_putc(*str);
-		str++;
-	}
+	nputs_all(str, len);
 	spin_unlock(&console_out_lock);
+}
+
+unsigned long sbi_nputs(const char *str, unsigned long len)
+{
+	unsigned long ret;
+
+	spin_lock(&console_out_lock);
+	ret = nputs(str, len);
+	spin_unlock(&console_out_lock);
+
+	return ret;
 }
 
 void sbi_gets(char *s, int maxwidth, char endchar)
@@ -62,6 +100,21 @@ void sbi_gets(char *s, int maxwidth, char endchar)
 		maxwidth--;
 	}
 	*retval = '\0';
+}
+
+unsigned long sbi_ngets(char *str, unsigned long len)
+{
+	int ch;
+	unsigned long i;
+
+	for (i = 0; i < len; i++) {
+		ch = sbi_getc();
+		if (ch < 0)
+			break;
+		str[i] = ch;
+	}
+
+	return i;
 }
 
 #define PAD_RIGHT 1
@@ -183,12 +236,30 @@ static int printi(char **out, u32 *out_len, long long i, int b, int sg,
 
 static int print(char **out, u32 *out_len, const char *format, va_list args)
 {
-	int width, flags;
-	int pc = 0;
-	char scr[2];
+	int width, flags, pc = 0;
+	char scr[2], *tout;
+	bool use_tbuf = (!out) ? true : false;
 	unsigned long long tmp;
 
+	/*
+	 * The console_tbuf is protected by console_out_lock and
+	 * print() is always called with console_out_lock held
+	 * when out == NULL.
+	 */
+	if (use_tbuf) {
+		console_tbuf_len = CONSOLE_TBUF_MAX;
+		tout = console_tbuf;
+		out = &tout;
+		out_len = &console_tbuf_len;
+	}
+
 	for (; *format != 0; ++format) {
+		if (use_tbuf && !console_tbuf_len) {
+			nputs_all(console_tbuf, CONSOLE_TBUF_MAX);
+			console_tbuf_len = CONSOLE_TBUF_MAX;
+			tout = console_tbuf;
+		}
+
 		if (*format == '%') {
 			++format;
 			width = flags = 0;
@@ -313,6 +384,9 @@ literal:
 			++pc;
 		}
 	}
+
+	if (use_tbuf && console_tbuf_len < CONSOLE_TBUF_MAX)
+		nputs_all(console_tbuf, CONSOLE_TBUF_MAX - console_tbuf_len);
 
 	return pc;
 }

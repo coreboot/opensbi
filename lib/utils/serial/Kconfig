@@ -9,6 +9,11 @@ config FDT_SERIAL
 
 if FDT_SERIAL
 
+config FDT_SERIAL_CADENCE
+	bool "Cadence UART FDT driver"
+	select SERIAL_CADENCE
+	default n
+
 config FDT_SERIAL_GAISLER
 	bool "Gaisler UART FDT driver"
 	select SERIAL_GAISLER
@@ -17,6 +22,11 @@ config FDT_SERIAL_GAISLER
 config FDT_SERIAL_HTIF
 	bool "Host transfer interface (HTIF) UART FDT driver"
 	select SYS_HTIF
+	default n
+
+config FDT_SERIAL_RENESAS_SCIF
+	bool "Renesas SCIF FDT driver"
+	select SERIAL_RENESAS_SCIF
 	default n
 
 config FDT_SERIAL_SHAKTI
@@ -46,8 +56,16 @@ config FDT_SERIAL_XILINX_UARTLITE
 
 endif
 
+config SERIAL_CADENCE
+	bool "Cadence UART support"
+	default n
+
 config SERIAL_GAISLER
 	bool "Gaisler UART support"
+	default n
+
+config SERIAL_RENESAS_SCIF
+	bool "Renesas SCIF support"
 	default n
 
 config SERIAL_SHAKTI
@@ -68,6 +86,10 @@ config SERIAL_UART8250
 
 config SERIAL_XILINX_UARTLITE
 	bool "Xilinx UART Lite support"
+	default n
+
+config SERIAL_SEMIHOSTING
+	bool "Semihosting support"
 	default n
 
 endmenu

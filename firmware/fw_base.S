@@ -79,13 +79,12 @@ _try_lottery:
 	lla	t0, __rel_dyn_start
 	lla	t1, __rel_dyn_end
 	beq	t0, t1, _relocate_done
-	j	5f
 2:
-	REG_L	t5, -(REGBYTES*2)(t0)	/* t5 <-- relocation info:type */
+	REG_L	t5, REGBYTES(t0)	/* t5 <-- relocation info:type */
 	li	t3, R_RISCV_RELATIVE	/* reloc type R_RISCV_RELATIVE */
 	bne	t5, t3, 3f
-	REG_L	t3, -(REGBYTES*3)(t0)
-	REG_L	t5, -(REGBYTES)(t0)	/* t5 <-- addend */
+	REG_L	t3, 0(t0)
+	REG_L	t5, (REGBYTES * 2)(t0)	/* t5 <-- addend */
 	add	t5, t5, t2
 	add	t3, t3, t2
 	REG_S	t5, 0(t3)		/* store runtime address to the GOT entry */
@@ -95,18 +94,17 @@ _try_lottery:
 	lla	t4, __dyn_sym_start
 
 4:
-	REG_L	t5, -(REGBYTES*2)(t0)	/* t5 <-- relocation info:type */
 	srli	t6, t5, SYM_INDEX	/* t6 <--- sym table index */
 	andi	t5, t5, 0xFF		/* t5 <--- relocation type */
 	li	t3, RELOC_TYPE
 	bne	t5, t3, 5f
 
 	/* address R_RISCV_64 or R_RISCV_32 cases*/
-	REG_L	t3, -(REGBYTES*3)(t0)
+	REG_L	t3, 0(t0)
 	li	t5, SYM_SIZE
 	mul	t6, t6, t5
 	add	s5, t4, t6
-	REG_L	t6, -(REGBYTES)(t0)	/* t0 <-- addend */
+	REG_L	t6, (REGBYTES * 2)(t0)	/* t0 <-- addend */
 	REG_L	t5, REGBYTES(s5)
 	add	t5, t5, t6
 	add	t5, t5, t2		/* t5 <-- location to fix up in RAM */
@@ -114,8 +112,8 @@ _try_lottery:
 	REG_S	t5, 0(t3)		/* store runtime address to the variable */
 
 5:
-	addi	t0, t0, (REGBYTES*3)
-	ble	t0, t1, 2b
+	addi	t0, t0, (REGBYTES * 3)
+	blt	t0, t1, 2b
 	j	_relocate_done
 _wait_relocate_copy_done:
 	j	_wait_for_boot_hart
@@ -128,9 +126,9 @@ _relocate:
 	REG_L	t1, 0(t1)
 	lla	t2, _load_start
 	REG_L	t2, 0(t2)
+	beq	t0, t2, _relocate_done
 	sub	t3, t1, t0
 	add	t3, t3, t2
-	beq	t0, t2, _relocate_done
 	lla	t4, _relocate_done
 	sub	t4, t4, t2
 	add	t4, t4, t0
@@ -298,6 +296,12 @@ _scratch_init:
 	sub	a5, t3, a4
 	REG_S	a4, SBI_SCRATCH_FW_START_OFFSET(tp)
 	REG_S	a5, SBI_SCRATCH_FW_SIZE_OFFSET(tp)
+
+	/* Store R/W section's offset in scratch space */
+	lla	a4, __fw_rw_offset
+	REG_L	a5, 0(a4)
+	REG_S	a5, SBI_SCRATCH_FW_RW_OFFSET(tp)
+
 	/* Store next arg1 in scratch space */
 	MOV_3R	s0, a0, s1, a1, s2, a2
 	call	fw_next_arg1
@@ -422,9 +426,8 @@ _start_warm:
 	li	ra, 0
 	call	_reset_regs
 
-	/* Disable and clear all interrupts */
+	/* Disable all interrupts */
 	csrw	CSR_MIE, zero
-	csrw	CSR_MIP, zero
 
 	/* Find HART count and HART stack size */
 	lla	a4, platform
@@ -519,6 +522,8 @@ _link_start:
 	RISCV_PTR	FW_TEXT_START
 _link_end:
 	RISCV_PTR	_fw_reloc_end
+__fw_rw_offset:
+	RISCV_PTR	_fw_rw_start - _fw_start
 
 	.section .entry, "ax", %progbits
 	.align 3

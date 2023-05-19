@@ -9,6 +9,11 @@ config FDT_RESET
 
 if FDT_RESET
 
+config FDT_RESET_ATCWDT200
+	bool "Andes WDT FDT reset driver"
+	depends on SYS_ATCSMU
+	default n
+
 config FDT_RESET_GPIO
 	bool "GPIO FDT reset driver"
 	depends on FDT_GPIO

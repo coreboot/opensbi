@@ -47,7 +47,7 @@ ifdef PLATFORM_DIR
     platform_parent_dir=$(platform_dir_path)
   else
     PLATFORM=$(shell basename $(platform_dir_path))
-    platform_parent_dir=$(subst $(PLATFORM),,$(platform_dir_path))
+    platform_parent_dir=$(shell realpath ${platform_dir_path}/..)
   endif
 else
  platform_parent_dir=$(src_dir)/platform
@@ -224,7 +224,7 @@ $(KCONFIG_CONFIG): $(platform_src_dir)/configs/$(PLATFORM_DEFCONFIG) $(platform_
 
 $(KCONFIG_AUTOCMD): $(KCONFIG_CONFIG)
 	$(CMD_PREFIX)mkdir -p $(KCONFIG_DIR)
-	$(CMD_PREFIX)echo -n "$(KCONFIG_CONFIG): " > $(KCONFIG_AUTOCMD)
+	$(CMD_PREFIX)printf "%s: " $(KCONFIG_CONFIG) > $(KCONFIG_AUTOCMD)
 	$(CMD_PREFIX)cat $(KCONFIG_AUTOLIST) | tr '\n' ' ' >> $(KCONFIG_AUTOCMD)
 
 include $(KCONFIG_CONFIG)
@@ -254,6 +254,7 @@ deps-y=$(platform-objs-path-y:.o=.dep)
 deps-y+=$(libsbi-objs-path-y:.o=.dep)
 deps-y+=$(libsbiutils-objs-path-y:.o=.dep)
 deps-y+=$(firmware-objs-path-y:.o=.dep)
+deps-y+=$(firmware-elfs-path-y:=.dep)
 
 # Setup platform ABI, ISA and Code Model
 ifndef PLATFORM_RISCV_ABI
@@ -330,7 +331,12 @@ GENFLAGS	+=	$(libsbiutils-genflags-y)
 GENFLAGS	+=	$(platform-genflags-y)
 GENFLAGS	+=	$(firmware-genflags-y)
 
-CFLAGS		=	-g -Wall -Werror -ffreestanding -nostdlib -fno-stack-protector -fno-strict-aliasing -O2
+CFLAGS		=	-g -Wall -Werror -ffreestanding -nostdlib -fno-stack-protector -fno-strict-aliasing
+ifneq ($(DEBUG),)
+CFLAGS		+=	-O0
+else
+CFLAGS		+=	-O2
+endif
 CFLAGS		+=	-fno-omit-frame-pointer -fno-optimize-sibling-calls -mstrict-align
 # enable -m(no-)save-restore option by CC_SUPPORT_SAVE_RESTORE
 ifeq ($(CC_SUPPORT_SAVE_RESTORE),y)
@@ -369,7 +375,7 @@ ASFLAGS		+=	$(firmware-asflags-y)
 ARFLAGS		=	rcs
 
 ELFFLAGS	+=	$(USE_LD_FLAG)
-ELFFLAGS	+=	-Wl,--build-id=none -Wl,-N
+ELFFLAGS	+=	-Wl,--build-id=none
 ELFFLAGS	+=	$(platform-ldflags-y)
 ELFFLAGS	+=	$(firmware-ldflags-y)
 
@@ -413,6 +419,11 @@ inst_file_list = $(CMD_PREFIX)if [ ! -z "$(4)" ]; then \
 inst_header_dir =  $(CMD_PREFIX)mkdir -p $(1); \
 	     echo " INSTALL   $(subst $(install_root_dir)/,,$(1))"; \
 	     cp -rf $(2) $(1)
+compile_cpp_dep = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
+	     echo " CPP-DEP   $(subst $(build_dir)/,,$(1))"; \
+	     printf %s `dirname $(1)`/  > $(1) && \
+	     $(CC) $(CPPFLAGS) -x c -MM $(3) \
+	       -MT `basename $(1:.dep=$(2))` >> $(1) || rm -f $(1)
 compile_cpp = $(CMD_PREFIX)mkdir -p `dirname $(1)`; \
 	     echo " CPP       $(subst $(build_dir)/,,$(1))"; \
 	     $(CPP) $(CPPFLAGS) -x c $(2) | grep -v "\#" > $(1)
@@ -478,6 +489,13 @@ $(build_dir)/lib/libsbi.a: $(libsbi-objs-path-y)
 $(platform_build_dir)/lib/libplatsbi.a: $(libsbi-objs-path-y) $(libsbiutils-objs-path-y) $(platform-objs-path-y)
 	$(call compile_ar,$@,$^)
 
+$(build_dir)/%.dep: $(src_dir)/%.carray $(KCONFIG_CONFIG)
+	$(call compile_gen_dep,$@,.c,$< $(KCONFIG_CONFIG))
+	$(call compile_gen_dep,$@,.o,$(@:.dep=.c))
+
+$(build_dir)/%.c: $(src_dir)/%.carray
+	$(call compile_carray,$@,$<)
+
 $(build_dir)/%.dep: $(src_dir)/%.c $(KCONFIG_CONFIG)
 	$(call compile_cc_dep,$@,$<)
 
@@ -535,6 +553,9 @@ $(platform_build_dir)/%.bin: $(platform_build_dir)/%.elf
 
 $(platform_build_dir)/%.elf: $(platform_build_dir)/%.o $(platform_build_dir)/%.elf.ld $(platform_build_dir)/lib/libplatsbi.a
 	$(call compile_elf,$@,$@.ld,$< $(platform_build_dir)/lib/libplatsbi.a)
+
+$(platform_build_dir)/%.dep: $(src_dir)/%.ldS $(KCONFIG_CONFIG)
+	$(call compile_cpp_dep,$@,.ld,$<)
 
 $(platform_build_dir)/%.ld: $(src_dir)/%.ldS
 	$(call compile_cpp,$@,$<)
@@ -623,6 +644,17 @@ install_firmwares: $(platform_build_dir)/lib/libplatsbi.a $(build_dir)/lib/libsb
 install_docs: $(build_dir)/docs/latex/refman.pdf
 	$(call inst_file,$(install_root_dir)/$(install_docs_path)/refman.pdf,$(build_dir)/docs/latex/refman.pdf)
 
+.PHONY: cscope
+cscope:
+	$(CMD_PREFIX)find \
+		"$(src_dir)/firmware" \
+		"$(src_dir)/include" \
+		"$(src_dir)/lib" \
+		"$(platform_src_dir)" \
+	-name "*.[chS]" -print > cscope.files
+	$(CMD_PREFIX)echo "$(KCONFIG_AUTOHEADER)" >> cscope.files
+	$(CMD_PREFIX)cscope -bkq -i cscope.files -f cscope.out
+
 # Rule for "make clean"
 .PHONY: clean
 clean:
@@ -652,6 +684,8 @@ ifeq ($(install_root_dir),$(install_root_dir_default)/usr)
 	$(if $(V), @echo " RM        $(install_root_dir_default)")
 	$(CMD_PREFIX)rm -rf $(install_root_dir_default)
 endif
+	$(if $(V), @echo " RM        $(src_dir)/cscope*")
+	$(CMD_PREFIX)rm -f $(src_dir)/cscope*
 
 .PHONY: FORCE
 FORCE:

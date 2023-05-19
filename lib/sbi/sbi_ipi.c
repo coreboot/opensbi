@@ -53,7 +53,7 @@ static int sbi_ipi_send(struct sbi_scratch *scratch, u32 remote_hartid,
 	if (ipi_ops->update) {
 		ret = ipi_ops->update(scratch, remote_scratch,
 				      remote_hartid, data);
-		if (ret < 0)
+		if (ret != SBI_IPI_UPDATE_SUCCESS)
 			return ret;
 	}
 
@@ -69,6 +69,18 @@ static int sbi_ipi_send(struct sbi_scratch *scratch, u32 remote_hartid,
 
 	sbi_pmu_ctr_incr_fw(SBI_PMU_FW_IPI_SENT);
 
+	return 0;
+}
+
+static int sbi_ipi_sync(struct sbi_scratch *scratch, u32 event)
+{
+	const struct sbi_ipi_event_ops *ipi_ops;
+
+	if ((SBI_IPI_EVENT_MAX <= event) ||
+	    !ipi_ops_array[event])
+		return SBI_EINVAL;
+	ipi_ops = ipi_ops_array[event];
+
 	if (ipi_ops->sync)
 		ipi_ops->sync(scratch);
 
@@ -83,32 +95,48 @@ static int sbi_ipi_send(struct sbi_scratch *scratch, u32 remote_hartid,
 int sbi_ipi_send_many(ulong hmask, ulong hbase, u32 event, void *data)
 {
 	int rc;
+	bool retry_needed;
 	ulong i, m;
+	struct sbi_hartmask target_mask = {0};
 	struct sbi_domain *dom = sbi_domain_thishart_ptr();
 	struct sbi_scratch *scratch = sbi_scratch_thishart_ptr();
 
+	/* Find the target harts */
 	if (hbase != -1UL) {
 		rc = sbi_hsm_hart_interruptible_mask(dom, hbase, &m);
 		if (rc)
 			return rc;
 		m &= hmask;
 
-		/* Send IPIs */
 		for (i = hbase; m; i++, m >>= 1) {
 			if (m & 1UL)
-				sbi_ipi_send(scratch, i, event, data);
+				sbi_hartmask_set_hart(i, &target_mask);
 		}
 	} else {
 		hbase = 0;
 		while (!sbi_hsm_hart_interruptible_mask(dom, hbase, &m)) {
-			/* Send IPIs */
 			for (i = hbase; m; i++, m >>= 1) {
 				if (m & 1UL)
-					sbi_ipi_send(scratch, i, event, data);
+					sbi_hartmask_set_hart(i, &target_mask);
 			}
 			hbase += BITS_PER_LONG;
 		}
 	}
+
+	/* Send IPIs */
+	do {
+		retry_needed = false;
+		sbi_hartmask_for_each_hart(i, &target_mask) {
+			rc = sbi_ipi_send(scratch, i, event, data);
+			if (rc == SBI_IPI_UPDATE_RETRY)
+				retry_needed = true;
+			else
+				sbi_hartmask_clear_hart(i, &target_mask);
+		}
+	} while (retry_needed);
+
+	/* Sync IPIs */
+	sbi_ipi_sync(scratch, event);
 
 	return 0;
 }
@@ -163,7 +191,7 @@ void sbi_ipi_clear_smode(void)
 
 static void sbi_ipi_process_halt(struct sbi_scratch *scratch)
 {
-	sbi_hsm_hart_stop(scratch, TRUE);
+	sbi_hsm_hart_stop(scratch, true);
 }
 
 static struct sbi_ipi_event_ops ipi_halt_ops = {
@@ -195,17 +223,14 @@ void sbi_ipi_process(void)
 	ipi_type = atomic_raw_xchg_ulong(&ipi_data->ipi_type, 0);
 	ipi_event = 0;
 	while (ipi_type) {
-		if (!(ipi_type & 1UL))
-			goto skip;
-
-		ipi_ops = ipi_ops_array[ipi_event];
-		if (ipi_ops && ipi_ops->process)
-			ipi_ops->process(scratch);
-
-skip:
+		if (ipi_type & 1UL) {
+			ipi_ops = ipi_ops_array[ipi_event];
+			if (ipi_ops && ipi_ops->process)
+				ipi_ops->process(scratch);
+		}
 		ipi_type = ipi_type >> 1;
 		ipi_event++;
-	};
+	}
 }
 
 int sbi_ipi_raw_send(u32 target_hart)
@@ -215,6 +240,12 @@ int sbi_ipi_raw_send(u32 target_hart)
 
 	ipi_dev->ipi_send(target_hart);
 	return 0;
+}
+
+void sbi_ipi_raw_clear(u32 target_hart)
+{
+	if (ipi_dev && ipi_dev->ipi_clear)
+		ipi_dev->ipi_clear(target_hart);
 }
 
 const struct sbi_ipi_device *sbi_ipi_get_device(void)
