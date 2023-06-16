@@ -26,7 +26,7 @@ struct sbi_domain *domidx_to_domain_table[SBI_DOMAIN_MAX_INDEX + 1] = { 0 };
 static u32 domain_count = 0;
 static bool domain_finalized = false;
 
-#define ROOT_REGION_MAX	16
+#define ROOT_REGION_MAX	256
 static u32 root_memregs_count = 0;
 
 struct sbi_domain root = {

@@ -16,7 +16,7 @@
 #define IMSIC_MMIO_PAGE_SHIFT		12
 #define IMSIC_MMIO_PAGE_SZ		(1UL << IMSIC_MMIO_PAGE_SHIFT)
 
-#define IMSIC_MAX_REGS			16
+#define IMSIC_MAX_REGS			256
 
 struct imsic_regs {
 	unsigned long addr;
