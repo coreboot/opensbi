@@ -24,6 +24,10 @@ firmware-cflags-y   +=	-fPIE -pie
 firmware-ldflags-y  +=	-Wl,--no-dynamic-linker -Wl,-pie
 endif
 
+ifeq ($(FW_RIVOS),y)
+firmware-genflags-y += -DFW_RIVOS=$(FW_RIVOS)
+endif
+
 ifdef FW_TEXT_START
 firmware-genflags-y += -DFW_TEXT_START=$(FW_TEXT_START)
 endif
@@ -35,7 +39,9 @@ firmware-genflags-y += -DFW_FDT_PADDING=$(FW_FDT_PADDING)
 endif
 endif
 
+ifndef FW_RIVOS
 firmware-bins-$(FW_DYNAMIC) += fw_dynamic.bin
+endif
 
 firmware-bins-$(FW_JUMP) += fw_jump.bin
 ifdef FW_JUMP_ADDR

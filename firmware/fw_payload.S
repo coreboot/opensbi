@@ -7,6 +7,9 @@
  *   Anup Patel <anup.patel@wdc.com>
  */
 
+#ifdef FW_RIVOS
+#include "fw_rivos.S"
+#endif
 #include "fw_base.S"
 
 	.section .entry, "ax", %progbits

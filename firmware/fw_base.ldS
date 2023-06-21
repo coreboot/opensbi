@@ -97,7 +97,7 @@
 	}
 
 	/* End of the read-write data sections */
-
-	. = ALIGN(0x1000); /* Need this to create proper sections */
+	/* MDRR region needs to be NAPOT regions */
+	. = ALIGN(1 << LOG2CEIL((SIZEOF(.data) + SIZEOF(.bss))));
 
 	PROVIDE(_fw_end = .);

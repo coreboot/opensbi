@@ -708,6 +708,46 @@
 #define CSR_MVIPH			0x319
 #define CSR_MIPH			0x354
 
+/* Rivos CSRs */
+
+/* R-mode CSRs */
+
+#define CSR_RTVEC	0x800
+#define CSR_RMODE	0x801
+#define CSR_RSCRATCH	0x802
+#define CSR_REPC	0x803
+
+/* Rivos Physical Memory Protection (RPMP) CSRs */
+#define CSR_MCRR_0_BASE 0x7d8
+#define CSR_MCRR_0_MASK 0x7d9
+#define CSR_MCRR_1_BASE 0x7da
+#define CSR_MCRR_1_MASK 0x7db
+
+#define CSR_MDRR_BASE 0x7d6
+#define CSR_MDRR_MASK 0x7d7
+
+/* Physical Memory Attribute range registers(PMARR) CSRs */
+#define CSR_PMARR_0_BASE 0x7c2
+#define CSR_PMARR_1_BASE 0x7c3
+#define CSR_PMARR_2_BASE 0x7c4
+#define CSR_PMARR_3_BASE 0x7c5
+#define CSR_PMARR_4_BASE 0x7c6
+#define CSR_PMARR_5_BASE 0x7c7
+#define CSR_PMARR_6_BASE 0x7c8
+#define CSR_PMARR_7_BASE 0x7c9
+#define CSR_PMARR_8_BASE 0x7ca
+#define CSR_PMARR_9_BASE 0x7cb
+#define CSR_PMARR_0_MASK 0x7cc
+#define CSR_PMARR_1_MASK 0x7cd
+#define CSR_PMARR_2_MASK 0x7ce
+#define CSR_PMARR_3_MASK 0x7cf
+#define CSR_PMARR_4_MASK 0x7d0
+#define CSR_PMARR_5_MASK 0x7d1
+#define CSR_PMARR_6_MASK 0x7d2
+#define CSR_PMARR_7_MASK 0x7d3
+#define CSR_PMARR_8_MASK 0x7d4
+#define CSR_PMARR_9_MASK 0x7d5
+
 /* ===== Trap/Exception Causes ===== */
 
 #define CAUSE_MISALIGNED_FETCH		0x0

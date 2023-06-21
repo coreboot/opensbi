@@ -12,6 +12,9 @@ ENTRY(_start)
 
 SECTIONS
 {
+#ifdef FW_RIVOS
+	#include "fw_rivos.ldS"
+#endif
 	#include "fw_base.ldS"
 
 	PROVIDE(_fw_reloc_end = .);
