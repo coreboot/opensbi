@@ -34,11 +34,14 @@ static int sbi_ecall_dbcn_handler(unsigned long extid, unsigned long funcid,
 		 * Based on above, we simply fail if the upper 32bits of
 		 * the physical address (i.e. a2 register) is non-zero on
 		 * RV32.
+                 *
+                 * Analogously, we fail if the upper 64bit of the
+                 * physical address (i.e. a2 register) is non-zero on
+                 * RV64.
 		 */
-#if __riscv_xlen == 32
 		if (regs->a2)
 			return SBI_ERR_FAILED;
-#endif
+
 		if (!sbi_domain_check_addr_range(sbi_domain_thishart_ptr(),
 					regs->a1, regs->a0, smode,
 					SBI_DOMAIN_READ|SBI_DOMAIN_WRITE))
@@ -58,15 +61,19 @@ static int sbi_ecall_dbcn_handler(unsigned long extid, unsigned long funcid,
 	return SBI_ENOTSUPP;
 }
 
-static int sbi_ecall_dbcn_probe(unsigned long extid, unsigned long *out_val)
+struct sbi_ecall_extension ecall_dbcn;
+
+static int sbi_ecall_dbcn_register_extensions(void)
 {
-	*out_val = sbi_console_get_device() ? 1 : 0;
-	return 0;
+	if (!sbi_console_get_device())
+		return 0;
+
+	return sbi_ecall_register_extension(&ecall_dbcn);
 }
 
 struct sbi_ecall_extension ecall_dbcn = {
-	.extid_start = SBI_EXT_DBCN,
-	.extid_end = SBI_EXT_DBCN,
-	.handle = sbi_ecall_dbcn_handler,
-	.probe = sbi_ecall_dbcn_probe,
+	.extid_start		= SBI_EXT_DBCN,
+	.extid_end		= SBI_EXT_DBCN,
+	.register_extensions	= sbi_ecall_dbcn_register_extensions,
+	.handle			= sbi_ecall_dbcn_handler,
 };

@@ -1,11 +1,15 @@
 RISC-V Open Source Supervisor Binary Interface (OpenSBI)
 ========================================================
 
+![RISC-V OpenSBI](docs/riscv_opensbi_logo_final_color.png)
+
 Copyright and License
 ---------------------
 
-The OpenSBI project is copyright (c) 2019 Western Digital Corporation
-or its affiliates and other contributors.
+The OpenSBI project is:
+
+* Copyright (c) 2019 Western Digital Corporation or its affiliates
+* Copyright (c) 2023 RISC-V International
 
 It is distributed under the terms of the BSD 2-clause license
 ("Simplified BSD License" or "FreeBSD License", SPDX: *BSD-2-Clause*).

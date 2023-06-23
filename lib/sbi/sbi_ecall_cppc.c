@@ -49,15 +49,19 @@ static int sbi_ecall_cppc_handler(unsigned long extid, unsigned long funcid,
 	return ret;
 }
 
-static int sbi_ecall_cppc_probe(unsigned long extid, unsigned long *out_val)
+struct sbi_ecall_extension ecall_cppc;
+
+static int sbi_ecall_cppc_register_extensions(void)
 {
-	*out_val = sbi_cppc_get_device() ? 1 : 0;
-	return 0;
+	if (!sbi_cppc_get_device())
+		return 0;
+
+	return sbi_ecall_register_extension(&ecall_cppc);
 }
 
 struct sbi_ecall_extension ecall_cppc = {
-	.extid_start	= SBI_EXT_CPPC,
-	.extid_end	= SBI_EXT_CPPC,
-	.handle		= sbi_ecall_cppc_handler,
-	.probe		= sbi_ecall_cppc_probe,
+	.extid_start		= SBI_EXT_CPPC,
+	.extid_end		= SBI_EXT_CPPC,
+	.register_extensions	= sbi_ecall_cppc_register_extensions,
+	.handle			= sbi_ecall_cppc_handler,
 };

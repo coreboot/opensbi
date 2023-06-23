@@ -22,34 +22,34 @@ static inline unsigned long sbi_ecall_vendor_id(void)
 		 (SBI_EXT_VENDOR_END - SBI_EXT_VENDOR_START));
 }
 
-static int sbi_ecall_vendor_probe(unsigned long extid,
-				  unsigned long *out_val)
-{
-	if (!sbi_platform_vendor_ext_check(sbi_platform_thishart_ptr()) ||
-	    extid != sbi_ecall_vendor_id())
-		*out_val = 0;
-	else
-		*out_val = 1;
-	return 0;
-}
-
 static int sbi_ecall_vendor_handler(unsigned long extid, unsigned long funcid,
 				    const struct sbi_trap_regs *regs,
 				    unsigned long *out_val,
 				    struct sbi_trap_info *out_trap)
 {
-	if (!sbi_platform_vendor_ext_check(sbi_platform_thishart_ptr()) ||
-	    extid != sbi_ecall_vendor_id())
-		return SBI_ERR_NOT_SUPPORTED;
-
 	return sbi_platform_vendor_ext_provider(sbi_platform_thishart_ptr(),
 						funcid, regs,
 						out_val, out_trap);
 }
 
+struct sbi_ecall_extension ecall_vendor;
+
+static int sbi_ecall_vendor_register_extensions(void)
+{
+	unsigned long extid = sbi_ecall_vendor_id();
+
+	if (!sbi_platform_vendor_ext_check(sbi_platform_thishart_ptr()))
+		return 0;
+
+	ecall_vendor.extid_start = extid;
+	ecall_vendor.extid_end = extid;
+
+	return sbi_ecall_register_extension(&ecall_vendor);
+}
+
 struct sbi_ecall_extension ecall_vendor = {
-	.extid_start = SBI_EXT_VENDOR_START,
-	.extid_end = SBI_EXT_VENDOR_END,
-	.probe = sbi_ecall_vendor_probe,
-	.handle = sbi_ecall_vendor_handler,
+	.extid_start		= SBI_EXT_VENDOR_START,
+	.extid_end		= SBI_EXT_VENDOR_END,
+	.register_extensions	= sbi_ecall_vendor_register_extensions,
+	.handle			= sbi_ecall_vendor_handler,
 };

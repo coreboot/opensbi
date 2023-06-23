@@ -17,6 +17,7 @@
 #include <sbi/sbi_ecall.h>
 #include <sbi/sbi_hart.h>
 #include <sbi/sbi_hartmask.h>
+#include <sbi/sbi_heap.h>
 #include <sbi/sbi_hsm.h>
 #include <sbi/sbi_ipi.h>
 #include <sbi/sbi_irqchip.h>
@@ -118,6 +119,20 @@ static void sbi_boot_print_general(struct sbi_scratch *scratch)
 	sbi_printf("Firmware Size             : %d KB\n",
 		   (u32)(scratch->fw_size / 1024));
 	sbi_printf("Firmware RW Offset        : 0x%lx\n", scratch->fw_rw_offset);
+	sbi_printf("Firmware RW Size          : %d KB\n",
+		   (u32)((scratch->fw_size - scratch->fw_rw_offset) / 1024));
+	sbi_printf("Firmware Heap Offset      : 0x%lx\n", scratch->fw_heap_offset);
+	sbi_printf("Firmware Heap Size        : "
+		   "%d KB (total), %d KB (reserved), %d KB (used), %d KB (free)\n",
+		   (u32)(scratch->fw_heap_size / 1024),
+		   (u32)(sbi_heap_reserved_space() / 1024),
+		   (u32)(sbi_heap_used_space() / 1024),
+		   (u32)(sbi_heap_free_space() / 1024));
+	sbi_printf("Firmware Scratch Size     : "
+		   "%d B (total), %d B (used), %d B (free)\n",
+		   SBI_SCRATCH_SIZE,
+		   (u32)sbi_scratch_used_space(),
+		   (u32)(SBI_SCRATCH_SIZE - sbi_scratch_used_space()));
 
 	/* SBI details */
 	sbi_printf("Runtime SBI Version       : %d.%d\n",
@@ -258,6 +273,11 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 		sbi_hart_hang();
 
 	/* Note: This has to be second thing in coldboot init sequence */
+	rc = sbi_heap_init(scratch);
+	if (rc)
+		sbi_hart_hang();
+
+	/* Note: This has to be the third thing in coldboot init sequence */
 	rc = sbi_domain_init(scratch, hartid);
 	if (rc)
 		sbi_hart_hang();
@@ -323,12 +343,6 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 		sbi_hart_hang();
 	}
 
-	rc = sbi_ecall_init();
-	if (rc) {
-		sbi_printf("%s: ecall init failed (error %d)\n", __func__, rc);
-		sbi_hart_hang();
-	}
-
 	/*
 	 * Note: Finalize domains after HSM initialization so that we
 	 * can startup non-root domains.
@@ -350,13 +364,25 @@ static void __noreturn init_coldboot(struct sbi_scratch *scratch, u32 hartid)
 	}
 
 	/*
-	 * Note: Platform final initialization should be last so that
-	 * it sees correct domain assignment and PMP configuration.
+	 * Note: Platform final initialization should be after finalizing
+	 * domains so that it sees correct domain assignment and PMP
+	 * configuration for FDT fixups.
 	 */
 	rc = sbi_platform_final_init(plat, true);
 	if (rc) {
 		sbi_printf("%s: platform final init failed (error %d)\n",
 			   __func__, rc);
+		sbi_hart_hang();
+	}
+
+	/*
+	 * Note: Ecall initialization should be after platform final
+	 * initialization so that all available platform devices are
+	 * already registered.
+	 */
+	rc = sbi_ecall_init();
+	if (rc) {
+		sbi_printf("%s: ecall init failed (error %d)\n", __func__, rc);
 		sbi_hart_hang();
 	}
 
