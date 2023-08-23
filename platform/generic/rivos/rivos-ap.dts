@@ -1,0 +1,216 @@
+/dts-v1/;
+
+/ {
+	#address-cells = <0x02>;
+	#size-cells = <0x02>;
+	compatible = "rivos,p1";
+	model = "rivos-cdie,qemu";
+
+	chosen {
+		bootargs = "root=/dev/nvme0n1 ro iommu.passthrough=0 iommu.strict=1 nokaslr earlycon=sbi bootmem_debug reboot=t panic=-1 console=ttyS0";
+		rng-seed = <0x870a8045 0xb5693a23 0xfd6dcf59 0xa400403c 0x385fb3d6 0x90d8250b 0x5fe7a517 0xaa688044>;
+	};
+
+	memory@180000000 {
+		compatible = "rivos,dpa-hbm";
+		numa-node-id = <0x01>;
+		device_type = "memory";
+		reg = <0x01 0x80000000 0x01 0x00>;
+	};
+
+	memory@80000000 {
+		numa-node-id = <0x00>;
+		device_type = "memory";
+		reg = <0x00 0x80000000 0x01 0x00>;
+	};
+
+	cpus {
+		#address-cells = <0x01>;
+		#size-cells = <0x00>;
+		timebase-frequency = <0x3b9aca00>;
+
+		cpu@0 {
+			phandle = <0x07>;
+			numa-node-id = <0x00>;
+			device_type = "cpu";
+			reg = <0x00>;
+			status = "okay";
+			compatible = "riscv";
+			riscv,cboz-block-size = <0x40>;
+			riscv,cbom-block-size = <0x40>;
+			riscv,isa = "rv64imafdcv_zicbom_zicboz_zicond_zicsr_zifencei_zfh_zfhmin_zcb_zba_zbb_zbc_zbs_zkr_zve32f_zve64f_zve64d_zvfh_zvfhmin_smaia_ssaia_sscofpmf_sstc_svadu_svinval_svpbmt";
+			mmu-type = "riscv,sv48";
+
+			interrupt-controller {
+				#interrupt-cells = <0x01>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+				phandle = <0x08>;
+			};
+		};
+
+		cpu@1 {
+			phandle = <0x05>;
+			numa-node-id = <0x00>;
+			device_type = "cpu";
+			reg = <0x01>;
+			status = "okay";
+			compatible = "riscv";
+			riscv,cboz-block-size = <0x40>;
+			riscv,cbom-block-size = <0x40>;
+			riscv,isa = "rv64imafdcv_zicbom_zicboz_zicond_zicsr_zifencei_zfh_zfhmin_zcb_zba_zbb_zbc_zbs_zkr_zve32f_zve64f_zve64d_zvfh_zvfhmin_smaia_ssaia_sscofpmf_sstc_svadu_svinval_svpbmt";
+			mmu-type = "riscv,sv48";
+
+			interrupt-controller {
+				#interrupt-cells = <0x01>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+				phandle = <0x06>;
+			};
+		};
+
+		cpu@2 {
+			phandle = <0x03>;
+			numa-node-id = <0x00>;
+			device_type = "cpu";
+			reg = <0x02>;
+			status = "okay";
+			compatible = "riscv";
+			riscv,cboz-block-size = <0x40>;
+			riscv,cbom-block-size = <0x40>;
+			riscv,isa = "rv64imafdcv_zicbom_zicboz_zicond_zicsr_zifencei_zfh_zfhmin_zcb_zba_zbb_zbc_zbs_zkr_zve32f_zve64f_zve64d_zvfh_zvfhmin_smaia_ssaia_sscofpmf_sstc_svadu_svinval_svpbmt";
+			mmu-type = "riscv,sv48";
+
+			interrupt-controller {
+				#interrupt-cells = <0x01>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+				phandle = <0x04>;
+			};
+		};
+
+		cpu@3 {
+			phandle = <0x01>;
+			numa-node-id = <0x00>;
+			device_type = "cpu";
+			reg = <0x03>;
+			status = "okay";
+			compatible = "riscv";
+			riscv,cboz-block-size = <0x40>;
+			riscv,cbom-block-size = <0x40>;
+			riscv,isa = "rv64imafdcv_zicbom_zicboz_zicond_zicsr_zifencei_zfh_zfhmin_zcb_zba_zbb_zbc_zbs_zkr_zve32f_zve64f_zve64d_zvfh_zvfhmin_smaia_ssaia_sscofpmf_sstc_svadu_svinval_svpbmt";
+			mmu-type = "riscv,sv48";
+
+			interrupt-controller {
+				#interrupt-cells = <0x01>;
+				interrupt-controller;
+				compatible = "riscv,cpu-intc";
+				phandle = <0x02>;
+			};
+		};
+
+		cpu-map {
+
+			cluster0 {
+
+				core0 {
+					cpu = <0x07>;
+				};
+
+				core1 {
+					cpu = <0x05>;
+				};
+
+				core2 {
+					cpu = <0x03>;
+				};
+
+				core3 {
+					cpu = <0x01>;
+				};
+			};
+		};
+	};
+
+	soc {
+		#address-cells = <0x02>;
+		#size-cells = <0x02>;
+		compatible = "simple-bus";
+		ranges;
+
+		pci@3f40000000 {
+			iommu-map = <0x00 0x8002 0x00 0x08 0x09 0x8002 0x09 0xfff7>;
+			ranges = <0x1000000 0x00 0x00 0x00 0x3000000 0x00 0x10000 0x2000000 0x00 0x42000000 0x00 0x42000000 0x00 0x3d800000 0x3000000 0x40 0x00 0x40 0x00 0x08 0x00>;
+			reg = <0x3f 0x40000000 0x00 0x4000000>;
+			msi-parent = <0x0a>;
+			dma-coherent;
+			bus-range = <0x00 0x3f>;
+			linux,pci-domain = <0x01>;
+			device_type = "pci";
+			compatible = "pci-host-ecam-generic";
+			#size-cells = <0x02>;
+			#interrupt-cells = <0x01>;
+			#address-cells = <0x03>;
+
+			iommu@8 {
+				phandle = <0x8002>;
+				#iommu-cells = <0x01>;
+				reg = <0x800 0x00 0x00 0x00 0x00>;
+				compatible = "riscv,pci-iommu";
+			};
+		};
+
+		pci@4000000 {
+			iommu-map = <0x4008 0x8000 0x4008 0x10 0x4030 0x8001 0x4030 0x08>;
+			ranges = <0x42000000 0x00 0x20000000 0x00 0x20000000 0x00 0x4000000>;
+			reg = <0x00 0x4000000 0x00 0x100000>;
+			msi-parent = <0x0a>;
+			dma-coherent;
+			bus-range = <0x40 0x40>;
+			linux,pci-domain = <0x00>;
+			device_type = "pci";
+			compatible = "pci-host-ecam-generic";
+			#size-cells = <0x02>;
+			#interrupt-cells = <0x01>;
+			#address-cells = <0x03>;
+
+			iommu@4028 {
+				phandle = <0x8001>;
+				#iommu-cells = <0x01>;
+				reg = <0x402800 0x00 0x00 0x00 0x00>;
+				compatible = "riscv,pci-iommu";
+			};
+
+			iommu@4010 {
+				phandle = <0x8000>;
+				#iommu-cells = <0x01>;
+				reg = <0x401000 0x00 0x00 0x00 0x00>;
+				compatible = "riscv,pci-iommu";
+			};
+		};
+
+		imsics@40000000 {
+			phandle = <0x0a>;
+			riscv,guest-index-bits = <0x03>;
+			riscv,num-ids = <0xff>;
+			reg = <0x00 0x40000000 0x00 0x7000 0x00 0x40008000 0x00 0x7000 0x00 0x40010000 0x00 0x7000 0x00 0x40018000 0x00 0x7000>;
+			interrupts-extended = <0x08 0x09 0x06 0x09 0x04 0x09 0x02 0x09>;
+			msi-controller;
+			interrupt-controller;
+			#interrupt-cells = <0x00>;
+			compatible = "riscv,imsics";
+		};
+
+		imsics@40007000 {
+			phandle = <0x09>;
+			riscv,ipi-id = <0x01>;
+			riscv,num-ids = <0xff>;
+			reg = <0x00 0x40007000 0x00 0x1000 0x00 0x4000f000 0x00 0x1000 0x00 0x40017000 0x00 0x1000 0x00 0x4001f000 0x00 0x1000>;
+			interrupts-extended = <0x08 0x0b 0x06 0x0b 0x04 0x0b 0x02 0x0b>;
+			msi-controller;
+			interrupt-controller;
+			#interrupt-cells = <0x00>;
+			compatible = "riscv,imsics";
+		};
+	};
+};
